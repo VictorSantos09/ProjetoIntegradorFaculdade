@@ -91,7 +91,7 @@ void enviarDadosParaMQTT(int valorAnalogico, float ppm, bool chama, float temper
 
   char bufferJson[256];
   serializeJson(doc, bufferJson);
-  clienteMQTT.publish("sensor/bmp280", bufferJson);
+  clienteMQTT.publish("sensor/valores", bufferJson);
 }
 
 void verificarConexaoMQTT() {
