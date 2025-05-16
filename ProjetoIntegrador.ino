@@ -1,13 +1,27 @@
+#include <ArduinoJson.h>
 #include <DHT.h>
 #include <math.h>
- 
 #define DHTPIN D4
 #define DHTTYPE DHT11
+#include <ESP8266WiFi.h>
+#include <PubSubClient.h>
+
 DHT dht(DHTPIN, DHTTYPE);
  
 const int PIN_PLACALED = D4;
 const int PIN_SENSOR_MQ7 = D5;
 const int MS_TEMPO_LEITURA = 1000;
+
+// Defina suas credenciais Wi-Fi
+const char* ssid = "SSID";
+const char* password = "SENHA";
+
+// Defina o endereço do seu broker MQTT
+const char* mqtt_server = "IP";
+const int mqtt_port = 0000;
+
+WiFiClient espClient;
+PubSubClient client(espClient);
  
 #pragma region [VARIAVEIS MQ-2]
 #define MQ_ANALOG_PIN A0
@@ -49,8 +63,67 @@ float calcularPPM(float rs_ro_ratio) {
   return pow(10, ((log10(rs_ro_ratio) - b) / m));
 }
  
+void enviarLeituraMQTT(int valorAnalogico_MQ_2, float ppmMQ_2, int chamaDetectada, float temperatura, float umidade, int monoxidoCarbonoDetectado){
+  Serial.println("enviando ao Broker");
+
+ // Cria um objeto JSON
+  StaticJsonDocument<200> doc;
+  doc["ValorAnalogico_MQ-2"] = valorAnalogico_MQ_2;
+  doc["ppm_MQ-2"] = ppmMQ_2;
+  doc["chamaDetectada"] = chamaDetectada;
+  doc["temperatura"] = temperatura;
+  doc["umidade"] = umidade;
+  doc["monoxidoCarbonoDetectado"] = monoxidoCarbonoDetectado;
+
+  // Serializa o JSON em uma string
+  char messageBuffer[256];
+  serializeJson(doc, messageBuffer); // Serializa o JSON diretamente no buffer
+
+  client.publish("sensor/bmp280", messageBuffer);
+}
+
+void verificarConexaoMQTT(){
+  if (!client.connected()) {
+    reconnect();
+  }
+  client.loop();
+}
+
+void reconnect() {
+  while (!client.connected()) {
+    Serial.print("Tentando conexão MQTT...");
+    
+    // Gerar um clientId único
+    String clientId = "ESP8266Client-" + String(random(0xffff), HEX);
+    
+    // Tenta conectar com clientId válido
+    if (client.connect(clientId.c_str())) {
+      Serial.println("Conectado!");
+    } else {
+      Serial.print("Falha na conexão, rc=");
+      Serial.print(client.state());
+      Serial.println(" Tente novamente em 5 segundos");
+      delay(5000);
+    }
+  }
+}
+
 void setup() {
   Serial.begin(115200);
+
+   // Conecta ao Wi-Fi
+   WiFi.begin(ssid, password);
+   while (WiFi.status() != WL_CONNECTED) {
+     delay(500);
+     Serial.print(".");
+   }
+   Serial.println("Conectado ao Wi-Fi!");
+   Serial.print("IP do ESP8266: ");
+   Serial.println(WiFi.localIP());
+ 
+   // Conecta ao broker MQTT
+   client.setServer(mqtt_server, mqtt_port);
+
   dht.begin();
  
   pinMode(PIN_PLACALED, OUTPUT);
@@ -61,6 +134,8 @@ void setup() {
 }
  
 void loop() {
+  verificarConexaoMQTT();
+
   #pragma region [PISCAR PLACA]
   digitalWrite(PIN_PLACALED, HIGH);
   delay(300);
@@ -92,7 +167,8 @@ void loop() {
  
   #pragma region [LEITURA KY-026]
   int flameDetected = digitalRead(PIN_KY_026);
-  if (flameDetected == LOW) {
+  bool chamaDetectada = flameDetected == LOW;
+  if (chamaDetectada) {
     Serial.println("🔥 Chama detectada!");
   } else {
     Serial.println("✅ Sem chama.");
@@ -118,12 +194,14 @@ void loop() {
  
   #pragma region [LEITURA MQ-7]
   int gasDetected = digitalRead(PIN_SENSOR_MQ7);
-  if (gasDetected == LOW) {
+  bool monoxidoCarbonoDetectado = gasDetected == LOW;
+  if (monoxidoCarbonoDetectado) {
     Serial.println("⚠️ Monóxido de carbono detectado!");
   } else {
     Serial.println("✅ Sem detecção de gás.");
   }
   #pragma endregion
  
+  enviarLeituraMQTT(averageGas, ppm, chamaDetectada, temperature, humidity, monoxidoCarbonoDetectado);
   delay(MS_TEMPO_LEITURA);
 }
