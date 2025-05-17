@@ -19,11 +19,11 @@ const int PINO_SENSOR_MQ2 = A0;
 const int INTERVALO_LEITURA_MS = 1000;
 
 // Credenciais Wi-Fi
-const char* ssid = "SENAC";
-const char* senha = "x1y2z3@snc";
+const char* ssid = "VilaineSantos";
+const char* senha = "Vilaine123!";
 
 // Servidor MQTT
-const char* endereco_mqtt = "10.10.29.26";
+const char* endereco_mqtt = "192.168.0.102";
 const int porta_mqtt = 1883;
 
 WiFiClient espClient;
@@ -88,6 +88,7 @@ void enviarDadosParaMQTT(int valorAnalogico, float ppm, bool chama, float temper
   doc["temperatura"] = temperatura;
   doc["umidade"] = umidade;
   doc["coDetectado"] = coDetectado;
+  doc["leituraEm"] = DateTime;
 
   char bufferJson[256];
   serializeJson(doc, bufferJson);
