@@ -23,7 +23,7 @@ const char* ssid = "SENAC";
 const char* senha = "x1y2z3@snc";
 
 // Servidor MQTT
-const char* endereco_mqtt = "10.10.30.29";
+const char* endereco_mqtt = "10.10.30.3";
 const int porta_mqtt = 1883;
 
 WiFiClient espClient;

@@ -1,31 +1,185 @@
-﻿@page "/counter"
+﻿@page "/graficos"
 @rendermode InteractiveServer
+@using System.Globalization
+@using System.Text.Json
+@inject NotificationService NotificationService
 
-<PageTitle>Counter</PageTitle>
+<PageTitle>Gráficos</PageTitle>
 
-<h1>Counter</h1>
+<RadzenStack class="rz-p-4 rz-p-md-6 rz-p-lg-12" Orientation="Orientation.Vertical">
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 2rem;">
+        <div>
+            <h3>Temperatura (°C)</h3>
+            <RadzenChart Style="height: 300px;">
+                <RadzenChartTooltipOptions Shared="@sharedTooltip" />
+                <RadzenLineSeries Data="@Data" CategoryProperty="Hora" ValueProperty="Temperatura" Title="Temperatura" Smooth="@smooth">
+                    <RadzenMarkers Visible="@showMarkers" />
+                    <RadzenSeriesDataLabels Visible="@showDataLabels" />
+                </RadzenLineSeries>
+                <RadzenValueAxis>
+                    <RadzenAxisTitle Text="Temperatura (°C)" />
+                </RadzenValueAxis>
+            </RadzenChart>
+        </div>
 
-<p role="status">Current count: @currentCount</p>
+        <div>
+            <h3>Umidade (%)</h3>
+            <RadzenChart Style="height: 300px;">
+                <RadzenChartTooltipOptions Shared="@sharedTooltip" />
+                <RadzenLineSeries Data="@Data" CategoryProperty="Hora" ValueProperty="Umidade" Title="Umidade" Smooth="@smooth">
+                    <RadzenMarkers Visible="@showMarkers" />
+                    <RadzenSeriesDataLabels Visible="@showDataLabels" />
+                </RadzenLineSeries>
+                <RadzenValueAxis>
+                    <RadzenAxisTitle Text="Umidade (%)" />
+                </RadzenValueAxis>
+            </RadzenChart>
+        </div>
 
-<button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
+        <div>
+            <h3>PPM</h3>
+            <RadzenChart Style="height: 300px;">
+                <RadzenChartTooltipOptions Shared="@sharedTooltip" />
+                <RadzenLineSeries Data="@Data" CategoryProperty="Hora" ValueProperty="PPM" Title="PPM" Smooth="@smooth">
+                    <RadzenMarkers Visible="@showMarkers" />
+                    <RadzenSeriesDataLabels Visible="@showDataLabels" />
+                </RadzenLineSeries>
+                <RadzenValueAxis>
+                    <RadzenAxisTitle Text="PPM" />
+                </RadzenValueAxis>
+            </RadzenChart>
+        </div>
+
+        <div>
+            <h3>Fogo Detectado</h3>
+            <RadzenChart Style="height: 300px;">
+                <RadzenChartTooltipOptions Shared="@sharedTooltip" />
+                <RadzenLineSeries Data="@Data" CategoryProperty="Hora" ValueProperty="FogoDetectadoValor" Title="Fogo Detectado" Smooth="@smooth">
+                    <RadzenMarkers Visible="@showMarkers" MarkerType="MarkerType.Triangle" />
+                    <RadzenSeriesDataLabels Visible="@showDataLabels" />
+                </RadzenLineSeries>
+                <RadzenValueAxis>
+                    <RadzenAxisTitle Text="Fogo Detectado" />
+                </RadzenValueAxis>
+            </RadzenChart>
+        </div>
+
+        <div>
+            <h3>Monóxido Detectado</h3>
+            <RadzenChart Style="height: 300px;">
+                <RadzenChartTooltipOptions Shared="@sharedTooltip" />
+                <RadzenLineSeries Data="@Data" CategoryProperty="Hora" ValueProperty="MonoxidoDetectadoValor" Title="Monóxido Detectado" Smooth="@smooth">
+                    <RadzenMarkers Visible="@showMarkers" MarkerType="MarkerType.Diamond" />
+                    <RadzenSeriesDataLabels Visible="@showDataLabels" />
+                </RadzenLineSeries>
+                <RadzenValueAxis>
+                    <RadzenAxisTitle Text="Monóxido Detectado" />
+                </RadzenValueAxis>
+            </RadzenChart>
+        </div>
+    </div>
+</RadzenStack>
 
 @code {
-    private int currentCount = 0;
+    bool smooth = false;
+    bool sharedTooltip = true;
+    bool showDataLabels = false;
+    bool showMarkers = true;
 
-    private void IncrementCount()
+    class SensorData
     {
-        currentCount++;
+        public string Hora { get; set; }
+        public double Temperatura { get; set; }
+        public double Umidade { get; set; }
+        public double PPM { get; set; }
+        public bool FogoDetectado { get; set; }
+        public bool MonoxidoDetectado { get; set; }
+
+        public int FogoDetectadoValor => FogoDetectado ? 1 : 0;
+        public int MonoxidoDetectadoValor => MonoxidoDetectado ? 1 : 0;
     }
+
+    class Valores
+    {
+        public DateTime LeituraEm { get; set; }
+        public double temperatura { get; set; }
+        public double umidade { get; set; }
+        public double ppm_MQ2 { get; set; }
+        public bool fogo { get; set; }
+        public bool monoxido { get; set; }
+    }
+
+    List<SensorData> Data = new();
+    List<Valores> LeiturasPorMinuto = new();
+    System.Timers.Timer? MinutoTimer;
 
     protected override void OnInitialized()
     {
-        // Assina o evento MQTT
         MqttMensagem.MensagemRecebida += OnMqttMensagemRecebida;
+
+        // MinutoTimer = new System.Timers.Timer(1000); // 60s
+        // MinutoTimer.Elapsed += ProcessarDadosPorMinuto;
+        // MinutoTimer.AutoReset = true;
+        // MinutoTimer.Start();
+    }
+
+    private void ProcessarDadosPorMinuto(object? sender, System.Timers.ElapsedEventArgs e)
+    {
+        if (LeiturasPorMinuto.Count == 0) return;
+
+        var mediaTemp = LeiturasPorMinuto.Average(v => v.temperatura);
+        var mediaUmidade = LeiturasPorMinuto.Average(v => v.umidade);
+        var mediaPPM = LeiturasPorMinuto.Average(v => v.ppm_MQ2);
+
+        var fogoDetectado = LeiturasPorMinuto.Any(v => v.fogo);
+        var monoxidoDetectado = LeiturasPorMinuto.Any(v => v.monoxido);
+
+        var sensorData = new SensorData
+            {
+                Hora = DateTime.Now.ToString("HH:mm:ss"),
+                Temperatura = Math.Round(mediaTemp, 2),
+                Umidade = Math.Round(mediaUmidade, 2),
+                PPM = Math.Round(mediaPPM, 2),
+                FogoDetectado = fogoDetectado,
+                MonoxidoDetectado = monoxidoDetectado
+            };
+
+        Data.Add(sensorData);
+        LeiturasPorMinuto.Clear();
+
+        Task.Run( async () => await InvokeAsync(StateHasChanged));
     }
 
     private async void OnMqttMensagemRecebida(object? sender, MensagemRecebidaEventArgs args)
     {
-        IncrementCount();
-        await InvokeAsync(StateHasChanged);
+        try
+        {
+            if (args.Topico == "sensor/config") return;
+
+            var valorAtual = JsonSerializer.Deserialize<Valores>(args.Mensagem);
+
+            if (valorAtual is not null)
+            {
+                const sbyte casasDecimais = 2;
+
+                valorAtual.LeituraEm = DateTime.Now;
+                valorAtual.temperatura = Math.Round(valorAtual.temperatura, casasDecimais);
+                valorAtual.umidade = Math.Round(valorAtual.umidade, casasDecimais);
+                valorAtual.ppm_MQ2 = Math.Round(valorAtual.ppm_MQ2, casasDecimais);
+
+                LeiturasPorMinuto.Add(valorAtual);
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Warning, "Aviso", "Valor de leitura inválido recebido, verifique.", closeOnClick: true);
+            }
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Erro", "Erro ao processar a mensagem recebida.", closeOnClick: true);
+            Console.WriteLine($"Erro ao processar mensagem MQTT: {ex.Message}");
+        }
     }
 }

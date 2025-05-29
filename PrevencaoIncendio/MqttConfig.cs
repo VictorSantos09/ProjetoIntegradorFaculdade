@@ -48,7 +48,7 @@ public class MqttConfig
 {
     public static readonly MqttClientFactory Factory = new();
     public static readonly IMqttClient Client = Factory.CreateMqttClient();
-    public const string Broker = "10.10.28.235";
+    public const string Broker = "10.10.30.3";
     public const int Port = 1883;
     public static void ConfigureFaker()
     {

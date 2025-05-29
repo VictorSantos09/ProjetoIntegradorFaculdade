@@ -1,19 +1,18 @@
 #include <ArduinoJson.h>
 #include <DHT.h>
 #include <math.h>
-#include <ESP8266WiFi.h>
+#include <WiFi.h>
 #include <PubSubClient.h>
 
-// Definições do sensor DHT11
-#define PINO_DHT D4
+// === Sensores e pinos ===
+#define PINO_DHT 33  // DHT11 no GPIO33
 #define TIPO_DHT DHT11
 DHT dht(PINO_DHT, TIPO_DHT);
 
-// Definições de pinos
-const int PINO_LED_PLACA = D4;
-const int PINO_SENSOR_MQ7 = D5;
-const int PINO_SENSOR_CHAMA = D3;
-const int PINO_SENSOR_MQ2 = A0;
+const int PINO_LED_PLACA = 2;          // LED embutido no ESP32 (opcional)
+const int PINO_SENSOR_MQ7 = 25;        // exemplo GPIO
+const int PINO_SENSOR_CHAMA = 4;       // KY-026 no GPIO4
+const int PINO_SENSOR_MQ2 = 32;        // MQ-2 no GPIO32 (analógico)
 
 // Intervalo de leitura
 const int INTERVALO_LEITURA_MS = 1000;
@@ -23,7 +22,7 @@ const char* ssid = "SENAC";
 const char* senha = "x1y2z3@snc";
 
 // Servidor MQTT
-const char* endereco_mqtt = "10.10.28.235";
+const char* endereco_mqtt = "10.10.30.29";
 const int porta_mqtt = 1883;
 
 WiFiClient espClient;
@@ -52,14 +51,14 @@ void calibrarSensorMQ2() {
   float somaRs = 0;
   for (int i = 0; i < 50; i++) {
     int leituraADC = analogRead(PINO_SENSOR_MQ2);
-    float tensaoSaida = leituraADC * (5.0 / 1023.0);
-    float Rs = (5.0 - tensaoSaida) / tensaoSaida * RESISTENCIA_CARGA;
+    float tensaoSaida = leituraADC * (3.3 / 4095.0);  // ESP32 usa 3.3V e 12 bits
+    float Rs = (3.3 - tensaoSaida) / tensaoSaida * RESISTENCIA_CARGA;
     somaRs += Rs;
     delay(100);
   }
 
   float RsMedio = somaRs / 50;
-  Ro = RsMedio / 9.83;  // valor típico em ar limpo para GLP
+  Ro = RsMedio / 9.83;  // valor típico em ar limpo
 
   Serial.print("✅ Calibração finalizada! Ro = ");
   Serial.print(Ro);
@@ -104,7 +103,7 @@ void verificarConexaoMQTT() {
 void reconectarMQTT() {
   while (!clienteMQTT.connected()) {
     Serial.print("🔁 Tentando conectar ao MQTT... ");
-    String clientId = "ESP8266Client-" + String(random(0xffff), HEX);
+    String clientId = "ESP32Client-" + String(random(0xffff), HEX);
     if (clienteMQTT.connect(clientId.c_str())) {
       Serial.println("Conectado!");
     } else {
@@ -116,8 +115,8 @@ void reconectarMQTT() {
   }
 }
 
-void configurarRecebimentoInformacao(){
-  
+void configurarRecebimentoInformacao() {
+  // opcional
 }
 
 // === Setup ===
@@ -131,7 +130,7 @@ void setup() {
     Serial.print(".");
   }
   Serial.println("\n✅ Wi-Fi conectado!");
-  Serial.print("IP do ESP8266: ");
+  Serial.print("IP do ESP32: ");
   Serial.println(WiFi.localIP());
 
   clienteMQTT.setServer(endereco_mqtt, porta_mqtt);
@@ -150,7 +149,6 @@ void setup() {
 void loop() {
   verificarConexaoMQTT();
 
-  // Pisca LED
   digitalWrite(PINO_LED_PLACA, HIGH);
   delay(300);
   digitalWrite(PINO_LED_PLACA, LOW);
@@ -163,8 +161,8 @@ void loop() {
   int mediaGas = totalGas / NUM_AMOSTRAS;
   if (mediaGas < 100) mediaGas = 0;
 
-  float tensao = mediaGas * (5.0 / 1023.0);
-  float Rs = (tensao > 0) ? (5.0 - tensao) / tensao * RESISTENCIA_CARGA : 0;
+  float tensao = mediaGas * (3.3 / 4095.0);  // ESP32: 12 bits e 3.3V
+  float Rs = (tensao > 0) ? (3.3 - tensao) / tensao * RESISTENCIA_CARGA : 0;
   float razao = (Ro > 0) ? Rs / Ro : 0;
   float ppm = (razao > 0) ? calcularPPM(razao) : 0;
 
@@ -175,11 +173,11 @@ void loop() {
   Serial.print(" | Estimado (ppm): ");
   Serial.println(ppm);
 
-  // Leitura da chama
+  // Chama
   bool chamaDetectada = digitalRead(PINO_SENSOR_CHAMA) == LOW;
   Serial.println(chamaDetectada ? "🔥 Chama detectada!" : "✅ Sem chama.");
 
-  // Leitura do DHT11
+  // DHT11
   float umidade = dht.readHumidity();
   float temperatura = dht.readTemperature();
   if (isnan(umidade) || isnan(temperatura)) {
@@ -194,11 +192,11 @@ void loop() {
     Serial.println(" %");
   }
 
-  // Leitura do MQ-7
+  // MQ-7
   bool coDetectado = digitalRead(PINO_SENSOR_MQ7) == LOW;
   Serial.println(coDetectado ? "⚠️ Monóxido de carbono detectado!" : "✅ Sem gás tóxico.");
 
-  // Envia dados via MQTT
+  // Enviar para MQTT
   enviarDadosParaMQTT(mediaGas, ppm, chamaDetectada, temperatura, umidade, coDetectado);
   delay(INTERVALO_LEITURA_MS);
 }
