@@ -1,5 +1,7 @@
 ﻿using System.Text.Json;
+using Microsoft.Extensions.Options;
 using MQTTnet;
+using PrevencaoIncendio.Config.Ip;
 using PrevencaoIncendio.Models;
 using PrevencaoIncendio.Repositories;
 
@@ -29,8 +31,6 @@ public class MqttConfig
 {
     public static readonly MqttClientFactory Factory = new();
     public static readonly IMqttClient Client = Factory.CreateMqttClient();
-    public const string Broker = "192.168.0.102";
-    public const int Port = 1883;
     #region FAKER
     public static void ConfigureFaker()
     {
@@ -61,11 +61,11 @@ public class MqttConfig
         //MqttMensagem.OnMensagemRecebida("sensor/#", jsonString);
     } 
     #endregion
-    public static async Task Configure(IValoresRepository valoresRepository)
+    public static async Task Configure(IValoresRepository valoresRepository, IOptions<IpAddress> ipAddress)
     {
         string clientId = Guid.NewGuid().ToString();
         string topic = "sensor/#";
-        MqttClientConnectResult connectResult = await Connect(clientId);
+        MqttClientConnectResult connectResult = await Connect(clientId, ipAddress.Value);
 
         if (connectResult.ResultCode == MqttClientConnectResultCode.Success)
         {
@@ -99,18 +99,18 @@ public class MqttConfig
         }
     }
 
-    public static async Task<MqttClientConnectResult> Connect(string clientId)
+    public static async Task<MqttClientConnectResult> Connect(string clientId, IpAddress ipAddress)
     {
-        MqttClientOptions options = GetOptions(clientId);
+        MqttClientOptions options = GetOptions(clientId, ipAddress);
 
         var connectResult = await Client.ConnectAsync(options);
         return connectResult;
     }
 
-    private static MqttClientOptions GetOptions(string clientId)
+    private static MqttClientOptions GetOptions(string clientId, IpAddress ipAddress)
     {
         return new MqttClientOptionsBuilder()
-                    .WithTcpServer(Broker, Port)
+                    .WithTcpServer(ipAddress.Broker, ipAddress.Port)
                     .WithClientId(clientId)
                     .WithCleanSession()
                     .Build();

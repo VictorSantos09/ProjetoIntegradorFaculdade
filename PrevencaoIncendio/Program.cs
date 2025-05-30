@@ -1,6 +1,7 @@
 using MongoDB.Driver;
 using PrevencaoIncendio;
 using PrevencaoIncendio.Components;
+using PrevencaoIncendio.Config.Ip;
 using PrevencaoIncendio.Data;
 using PrevencaoIncendio.Repositories;
 using Radzen;
@@ -20,6 +21,7 @@ builder.Services.AddTransient(sp =>
 });
 
 builder.Services.AddTransient<IValoresRepository, ValoresRepository>();
+builder.Services.Configure<IpAddress>(builder.Configuration.GetSection("IpAddress"));
 builder.Services.AddHostedService<MqttWorker>();
 
 // Add services to the container.
