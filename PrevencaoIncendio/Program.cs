@@ -7,7 +7,12 @@ using Radzen;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddTransient<IMongoClient>(sp => new MongoClient(DbManager.ConnectionString));
+builder.Services.AddTransient<IMongoClient>(sp =>
+{
+    var settings = MongoClientSettings.FromConnectionString(builder.Configuration.GetConnectionString("Default"));
+    settings.ServerApi = new ServerApi(ServerApiVersion.V1);
+    return new MongoClient(settings);
+});
 builder.Services.AddTransient(sp =>
 {
     var client = sp.GetRequiredService<IMongoClient>();
