@@ -10,7 +10,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddTransient<IMongoClient>(sp =>
 {
-    var settings = MongoClientSettings.FromConnectionString(builder.Configuration.GetConnectionString("Default"));
+    var isProduction = builder.Configuration.GetValue<bool>("ConnectionStrings:IsProduction");
+    var connectionStringDev = builder.Configuration.GetConnectionString("Default");
+
+    var path = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "connectionString.env"));
+    var connectionStringPrd = File.ReadAllText(path);
+
+    var settings = MongoClientSettings.FromConnectionString(isProduction ? connectionStringPrd : connectionStringDev);
     settings.ServerApi = new ServerApi(ServerApiVersion.V1);
     return new MongoClient(settings);
 });
