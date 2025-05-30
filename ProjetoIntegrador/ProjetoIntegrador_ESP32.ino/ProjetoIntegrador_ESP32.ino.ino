@@ -11,7 +11,7 @@
 DHT dht(PINO_DHT, TIPO_DHT);
 
 const int PINO_LED_PLACA = 2;          // LED embutido no ESP32 (opcional)
-const int PINO_SENSOR_MQ7 = 25;        // exemplo GPIO
+const int PINO_SENSOR_MQ7 = 35;        // exemplo GPIO
 const int PINO_SENSOR_CHAMA = 4;       // KY-026 no GPIO4
 const int PINO_SENSOR_MQ2 = 32;        // MQ-2 no GPIO32 (analógico)
 
@@ -23,7 +23,7 @@ const char* ssid = "SENAC";
 const char* senha = "x1y2z3@snc";
 
 // Servidor MQTT
-const char* endereco_mqtt = "10.10.30.3";
+const char* endereco_mqtt = "10.10.29.69";
 const int porta_mqtt = 1883;
 
 WiFiClient espClient;
@@ -194,7 +194,12 @@ void loop() {
   }
 
   // MQ-7
-  bool coDetectado = digitalRead(PINO_SENSOR_MQ7) == LOW;
+  int leituraAnalogica = analogRead(PINO_SENSOR_MQ7);
+
+  int limiteCO = 1500; // valor de exemplo – depende da calibração
+
+  bool coDetectado = leituraAnalogica >= limiteCO;
+  Serial.println(leituraAnalogica);
   Serial.println(coDetectado ? "⚠️ Monóxido de carbono detectado!" : "✅ Sem gás tóxico.");
 
   // Enviar para MQTT
