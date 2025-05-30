@@ -1,27 +1,9 @@
 ﻿using System.Text.Json;
 using MQTTnet;
+using PrevencaoIncendio.Models;
+using PrevencaoIncendio.Repositories;
 
 namespace PrevencaoIncendio;
-
-public class Valores
-{
-    public Guid Guid { get; set; }
-    public int valorAnalogico_MQ2 { get; set; }
-    public double ppm_MQ2 { get; set; }
-    public bool chamaDetectada { get; set; }
-    public double temperatura { get; set; }
-    public double umidade { get; set; }
-    public bool coDetectado { get; set; }
-    public DateTime LeituraEm { get; set; }
-}
-
-public class Calibrando
-{
-    public bool calibrando { get; set; }
-    public double Ro { get; set; }
-    public double Rs { get; set; }
-    public DateTime LeituraEm { get; set; }
-}
 
 public class MensagemRecebidaEventArgs : EventArgs
 {
@@ -34,7 +16,6 @@ public class MensagemRecebidaEventArgs : EventArgs
         Mensagem = mensagem;
     }
 }
-
 public static class MqttMensagem
 {
     public static event EventHandler<MensagemRecebidaEventArgs>? MensagemRecebida;
@@ -48,8 +29,9 @@ public class MqttConfig
 {
     public static readonly MqttClientFactory Factory = new();
     public static readonly IMqttClient Client = Factory.CreateMqttClient();
-    public const string Broker = "10.10.30.3";
+    public const string Broker = "192.168.0.102";
     public const int Port = 1883;
+    #region FAKER
     public static void ConfigureFaker()
     {
         var timer = new System.Timers.Timer(1000);
@@ -64,22 +46,22 @@ public class MqttConfig
     }
     private static void OnTimedEvent(object source, System.Timers.ElapsedEventArgs e)
     {
-        var valores = new Valores
-        {
-            Guid = Guid.NewGuid(),
-            valorAnalogico_MQ2 = 100,
-            ppm_MQ2 = 750,
-            chamaDetectada = true,
-            temperatura = 46.0,
-            umidade = 60.0,
-            coDetectado = false,
-            LeituraEm = DateTime.Now
-        };
-        var jsonString = JsonSerializer.Serialize(valores);
-        
-        MqttMensagem.OnMensagemRecebida("sensor/#", jsonString);
-    }
-    public static async Task Configure()
+        //var valores = new Valores
+        //{
+        //    valorAnalogico_MQ2 = 100,
+        //    ppm_MQ2 = 750,
+        //    chamaDetectada = true,
+        //    temperatura = 46.0,
+        //    umidade = 60.0,
+        //    coDetectado = false,
+        //    LeituraEm = DateTime.Now
+        //};
+        //var jsonString = JsonSerializer.Serialize(valores);
+
+        //MqttMensagem.OnMensagemRecebida("sensor/#", jsonString);
+    } 
+    #endregion
+    public static async Task Configure(IValoresRepository valoresRepository)
     {
         string clientId = Guid.NewGuid().ToString();
         string topic = "sensor/#";
@@ -96,7 +78,19 @@ public class MqttConfig
                 var payloadString = e.ApplicationMessage.ConvertPayloadToString();
                 var receivedTopic = e.ApplicationMessage.Topic;
 
-                MqttMensagem.OnMensagemRecebida(receivedTopic, payloadString);
+                try
+                {
+                    var valores = JsonSerializer.Deserialize<Valores>(payloadString);
+
+                    if (valores is not null)
+                    {
+                        await valoresRepository.InsertOne(valores);
+                    }
+                }
+                finally
+                {
+                    MqttMensagem.OnMensagemRecebida(receivedTopic, payloadString);
+                }
             };
         }
         else
