@@ -11,7 +11,7 @@ public static class RedisDatabaseExtensions
     T data,
     TimeSpan? absoluteExpireTime = null)
     {
-        var expirationStr = AppSettingsProvider.Configuration["Redis:DefaultExpiration"];
+        var expirationStr = AppSettingsProvider.Configuration["ConnectionStrings:Redis:DefaultExpiration"];
 
         TimeSpan defaultExpiration = TimeSpan.TryParse(expirationStr, out var parsed)
             ? parsed
