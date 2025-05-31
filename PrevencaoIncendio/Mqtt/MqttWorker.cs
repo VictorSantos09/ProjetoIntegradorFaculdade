@@ -2,7 +2,7 @@
 using PrevencaoIncendio.Config.Ip;
 using PrevencaoIncendio.Repositories;
 
-namespace PrevencaoIncendio;
+namespace PrevencaoIncendio.Mqtt;
 
 public class MqttWorker : BackgroundService
 {

@@ -1,72 +1,155 @@
-﻿@using Radzen
+﻿@using PrevencaoIncendio.Caching
+@using Radzen
 @using Radzen.Blazor
 
-@typeparam TItem
+@inject IDatabase Cache
+@inject IValoresRepository ValoresRepository
 
-<RadzenStack class="rz-p-4 rz-p-md-6 rz-p-lg-12" Orientation="Orientation.Vertical">
-    <RadzenCard Variant="Variant.Outlined">
-        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
-            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                <RadzenCheckBox @bind-Value="@smooth" Name="smooth"></RadzenCheckBox>
-                <RadzenLabel Text="Smooth" Component="smooth" />
-            </RadzenStack>
-            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                <RadzenCheckBox @bind-Value="@showDataLabels" Name="dataLabels"></RadzenCheckBox>
-                <RadzenLabel Text="Show Data Labels" Component="dataLabels" />
-            </RadzenStack>
-            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                <RadzenCheckBox @bind-Value="@showMarkers" Name="markers"></RadzenCheckBox>
-                <RadzenLabel Text="Show Markers" Component="markers" />
-            </RadzenStack>
-            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                <RadzenCheckBox @bind-Value="@sharedTooltip" Name="sharedTooltip"></RadzenCheckBox>
-                <RadzenLabel Text="Shared Tooltip" Component="sharedTooltip" />
-            </RadzenStack>
+<RadzenStack Orientation="Orientation.Vertical" Gap="2rem" class="rz-p-8 rz-p-md-6 rz-p-lg-12">
+
+    <RadzenCard Variant="Variant.Outlined" Class="rz-p-4 rz-mb-4">
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap" Gap="1rem">
+            <RadzenCheckBox @bind-Value="@showDataLabels" Name="dataLabels" />
+            <RadzenLabel Text="Show Data Labels" Component="dataLabels" />
+
+            <RadzenCheckBox @bind-Value="@showMarkers" Name="markers" />
+            <RadzenLabel Text="Show Markers" Component="markers" />
         </RadzenStack>
     </RadzenCard>
 
-    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 2rem;">
-        @foreach (var chart in Charts)
-        {
-            <div>
-                <h3>@chart.Title</h3>
-                <RadzenChart Style="height: 300px;">
-                    <RadzenChartTooltipOptions Shared="@sharedTooltip" />
-                    <RadzenLineSeries Data="@Data"
-                    CategoryProperty="Hora"
-                    ValueProperty="@chart.ValueProperty"
-                    Title="@chart.Title"
-                    Smooth="@smooth">
-                        <RadzenMarkers Visible="@showMarkers" MarkerType="@chart.MarkerType" />
-                        <RadzenSeriesDataLabels Visible="@showDataLabels" />
-                    </RadzenLineSeries>
-                    <RadzenValueAxis>
-                        <RadzenAxisTitle Text="@chart.Title" />
-                    </RadzenValueAxis>
-                </RadzenChart>
-            </div>
-        }
+    <!-- Gráfico 1: Temperatura e Umidade -->
+    <div>
+        <h3>Temperatura e Umidade</h3>
+        <RadzenChart>
+            <RadzenLineSeries Data="@ProcessedData" CategoryProperty="Hora" ValueProperty="Temperatura" Title="Temperatura (°C)">
+                <RadzenMarkers Visible="@showMarkers" MarkerType="MarkerType.Diamond" />
+                <RadzenSeriesDataLabels Visible="@showDataLabels" />
+            </RadzenLineSeries>
+
+            <RadzenLineSeries Data="@ProcessedData" CategoryProperty="Hora" ValueProperty="Umidade" Title="Umidade (%)">
+                <RadzenMarkers Visible="@showMarkers" MarkerType="MarkerType.Diamond" />
+                <RadzenSeriesDataLabels Visible="@showDataLabels" />
+            </RadzenLineSeries>
+
+            <RadzenValueAxis>
+                <RadzenAxisTitle Text="Valores" />
+                <RadzenGridLines Visible="true" />
+            </RadzenValueAxis>
+
+            <RadzenCategoryAxis>
+                <RadzenGridLines Visible="true" />
+            </RadzenCategoryAxis>
+
+            <RadzenChartTooltip />
+        </RadzenChart>
     </div>
+
+    <!-- Gráfico 2: Fogo e Monóxido Detectado -->
+    <div>
+        <h3>Fogo e Monóxido Detectado</h3>
+        <RadzenChart Style="height: 300px;">
+            <RadzenLineSeries Data="@ProcessedData" CategoryProperty="Hora" ValueProperty="FogoDetectado" Title="Fogo Detectado">
+                <RadzenMarkers Visible="@showMarkers" MarkerType="MarkerType.Triangle" />
+                <RadzenSeriesDataLabels Visible="@showDataLabels" />
+            </RadzenLineSeries>
+
+            <RadzenLineSeries Data="@ProcessedData" CategoryProperty="Hora" ValueProperty="MonoxidoDetectado" Title="Monóxido Detectado">
+                <RadzenMarkers Visible="@showMarkers" MarkerType="MarkerType.Triangle" />
+                <RadzenSeriesDataLabels Visible="@showDataLabels" />
+            </RadzenLineSeries>
+
+            <RadzenValueAxis>
+                <RadzenAxisTitle Text="Detectado (0 = Não, 1 = Sim)" />
+                <RadzenGridLines Visible="true" />
+            </RadzenValueAxis>
+
+            <RadzenCategoryAxis>
+                <RadzenGridLines Visible="true" />
+            </RadzenCategoryAxis>
+
+            <RadzenChartTooltip />
+        </RadzenChart>
+    </div>
+
+    <!-- Gráfico 3: PPM -->
+    <div>
+        <h3>PPM MQ2</h3>
+        <RadzenChart Style="height: 300px;">
+            <RadzenLineSeries Data="@ProcessedData" CategoryProperty="Hora" ValueProperty="PPM" Title="PPM MQ2">
+                <RadzenMarkers Visible="@showMarkers" MarkerType="MarkerType.Square" />
+                <RadzenSeriesDataLabels Visible="@showDataLabels" />
+            </RadzenLineSeries>
+
+            <RadzenValueAxis>
+                <RadzenAxisTitle Text="PPM" />
+                <RadzenGridLines Visible="true" />
+            </RadzenValueAxis>
+
+            <RadzenCategoryAxis>
+                <RadzenGridLines Visible="true" />
+            </RadzenCategoryAxis>
+
+            <RadzenChartTooltip />
+        </RadzenChart>
+    </div>
+
 </RadzenStack>
 
 @code {
-    [Parameter] public IEnumerable<TItem> Data { get; set; } = [];
+    [Parameter] public IEnumerable<Valores>? Data { get; set; } = null;
 
-    private bool smooth = false;
-    private bool showDataLabels = false;
-    private bool showMarkers = false;
-    private bool sharedTooltip = false;
-    private string LoadLocation = "";
-    private string IsCacheData = "";
+    private IEnumerable<SensorData> ProcessedData { get; set; } = new List<SensorData>();
 
-    private List<ChartDefinition> Charts = new()
+    private bool showDataLabels = true;
+    private bool showMarkers = true;
+
+    protected override async Task OnInitializedAsync()
     {
-        new ChartDefinition("Temperatura (°C)", "Temperatura"),
-        new ChartDefinition("Umidade (%)", "Umidade"),
-        new ChartDefinition("PPM", "PPM"),
-        new ChartDefinition("Fogo Detectado", "FogoDetectadoValor", MarkerType.Triangle),
-        new ChartDefinition("Monóxido Detectado", "MonoxidoDetectadoValor", MarkerType.Diamond),
-    };
+        await ProcessarDadosPorMinuto();
+    }
 
-    private record ChartDefinition(string Title, string ValueProperty, MarkerType MarkerType = MarkerType.Circle);
+    private async Task ProcessarDadosPorMinuto()
+    {
+        IEnumerable<Valores> valores;
+
+        if (Data is null)
+        {
+            var cacheData = await Cache.GetRecordAsync<IEnumerable<Valores>>(CacheKeys.VALOR_SENSORES) ?? Enumerable.Empty<Valores>();
+            if (cacheData.Any())
+            {
+                valores = cacheData;
+            }
+            else
+            {
+                valores = await ValoresRepository.GetLastMinutesGroupedAsync(600000);
+                await Cache.SetRecordAsync(CacheKeys.VALOR_SENSORES, valores);
+            }
+        }
+        else
+        {
+            valores = Data;
+        }
+
+        ProcessedData = valores.Select(d => new SensorData
+            {
+                Hora = d.LeituraEm.ToLocalTime().ToString("HH:mm"),
+                Temperatura = Math.Round(d.temperatura, 2),
+                Umidade = Math.Round(d.umidade, 2),
+                PPM = Math.Round(d.ppm_MQ2, 2),
+                FogoDetectado = d.chamaDetectada ? 1 : 0,
+                MonoxidoDetectado = d.coDetectado ? 1 : 0
+            }).ToList();
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private class SensorData
+    {
+        public string Hora { get; set; } = "";
+        public double Temperatura { get; set; }
+        public double Umidade { get; set; }
+        public double PPM { get; set; }
+        public int FogoDetectado { get; set; }
+        public int MonoxidoDetectado { get; set; }
+    }
 }

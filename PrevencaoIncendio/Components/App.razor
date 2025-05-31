@@ -1,5 +1,5 @@
 ﻿<!DOCTYPE html>
-<html lang="en">
+<html lang="pt-br">
 
 <head>
     <meta charset="utf-8" />
@@ -11,28 +11,13 @@
     <ImportMap />
     <link rel="icon" type="image/png" href="favicon.png" />
     <HeadOutlet />
-    <RadzenTheme Theme="material" @rendermode="InteractiveServer" />
+    <RadzenTheme Theme="standard-dark" @rendermode="InteractiveServer" />
 </head>
-
-<script>
-    window.playSound = function (url) {
-        const audio = new Audio(url);
-        audio.play().catch(e => console.warn("Autoplay bloqueado:", e));
-    };
-</script>
 
 <body>
     <Routes @rendermode="@RenderMode.InteractiveServer" />
     <script src="_framework/blazor.web.js"></script>
     <script src="_content/Radzen.Blazor/Radzen.Blazor.js?v=@(typeof(Radzen.Colors).Assembly.GetName().Version)"></script>
-
-    <script>
-        window.playSound = function (url) {
-            const audio = new Audio(url);
-            audio.play().catch(e => console.warn("Autoplay bloqueado:", e));
-        };
-    </script>
-
 </body>
 
 </html>
