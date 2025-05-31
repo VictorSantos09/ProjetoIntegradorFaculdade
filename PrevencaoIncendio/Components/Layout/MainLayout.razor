@@ -1,25 +1,35 @@
 ﻿@inherits LayoutComponentBase
 
-<RadzenComponents @rendermode="InteractiveServer" />
-
-<div class="page">
-    @* <div class="sidebar">
-        <NavMenu />
-    </div> *@
-
-    <main>
-        @* <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div> *@
-
-        <article class="content px-4">
+<RadzenLayout style="position: relative;grid-template-areas: 'rz-sidebar rz-header' 'rz-sidebar rz-body'">
+    <RadzenHeader>
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0">
+            <RadzenSidebarToggle Click="@(() => sidebarExpanded = !sidebarExpanded)" />
+            <RadzenLabel Text="Prevenção de incêndio" />
+        </RadzenStack>
+    </RadzenHeader>
+    <RadzenSidebar Responsive="false" @bind-Expanded="@sidebarExpanded" style="position: absolute; z-index: 3">
+        <RadzenStack AlignItems="AlignItems.End" class="rz-p-2">
+            <RadzenButton Icon="west" Variant="Variant.Text" ButtonStyle="ButtonStyle.Secondary" Click="@(() => sidebarExpanded = false)" />
+        </RadzenStack>
+        <RadzenPanelMenu>
+            <RadzenPanelMenuItem Text="Inicio" Icon="home" Path="/"/>
+            <RadzenPanelMenuItem Text="Gráfico" Icon="bar_chart" Path="/graficos" />
+        </RadzenPanelMenu>
+        <div class="rz-p-4">
+            @* Sidebar *@
+        </div>
+    </RadzenSidebar>
+    <RadzenBody>
+        <div class="rz-p-4">
             @Body
-        </article>
-    </main>
-</div>
+        </div>
+    </RadzenBody>
+    @if (sidebarExpanded)
+    {
+        <div @onclick="@(() => sidebarExpanded = false)" class="rz-dialog-mask" style="position: absolute; z-index: 2"></div>
+    }
+</RadzenLayout>
 
-<div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
-</div>
+@code {
+    bool sidebarExpanded = false;
+}}

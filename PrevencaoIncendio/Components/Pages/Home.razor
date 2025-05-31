@@ -9,288 +9,269 @@
 
 <RadzenStack Gap="20px">
 
-	<!-- Configuração de Estilo -->
-	<RadzenCard Variant="Variant.Outlined" class="rz-shadow-lg rz-rounded-lg p-4">
-		<RadzenStack Orientation="Orientation.Horizontal" Gap="16px" AlignItems="AlignItems.Center">
-			<RadzenLabel Text="Modo de Exibição" />
+    <!-- Configuração de Estilo -->
+    <RadzenCard Variant="Variant.Outlined" class="rz-shadow-lg rz-rounded-lg p-4">
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="16px" AlignItems="AlignItems.Center">
+            <RadzenLabel Text="Modo de Exibição" />
 
-			<!-- SelectBar visível apenas em telas grandes -->
-			<RadzenSelectBar @bind-Value="@density"
-							 TextProperty="Text"
-							 ValueProperty="Value"
-							 Data="@(Enum.GetValues(typeof(Density)).Cast<Density>().Select(t => new { Text = t.ToString(), Value = t }))"
-							 Size="ButtonSize.Medium"
-							 Style="max-width: 300px;"
-							 class="rz-display-none rz-display-xl-flex" />
+            <!-- SelectBar visível apenas em telas grandes -->
+            <RadzenSelectBar @bind-Value="@density"
+            TextProperty="Text"
+            ValueProperty="Value"
+            Data="@(Enum.GetValues(typeof(Density)).Cast<Density>().Select(t => new { Text = t.ToString(), Value = t }))"
+            Size="ButtonSize.Medium"
+            Style="max-width: 300px;"
+            class="rz-display-none rz-display-xl-flex" />
 
-			<!-- DropDown visível em telas menores -->
-			<RadzenDropDown @bind-Value="@density"
-							TextProperty="Text"
-							ValueProperty="Value"
-							Data="@(Enum.GetValues(typeof(Density)).Cast<Density>().Select(t => new { Text = t.ToString(), Value = t }))"
-							Style="max-width: 300px;"
-							class="rz-display-inline-flex rz-display-xl-none" />
+            <!-- DropDown visível em telas menores -->
+            <RadzenDropDown @bind-Value="@density"
+            TextProperty="Text"
+            ValueProperty="Value"
+            Data="@(Enum.GetValues(typeof(Density)).Cast<Density>().Select(t => new { Text = t.ToString(), Value = t }))"
+            Style="max-width: 300px;"
+            class="rz-display-inline-flex rz-display-xl-none" />
 
-			<RadzenCheckBox @bind-Value=@MostrarExtra Name="CheckBox1" />
-			<RadzenLabel Text="Alertar fogo e Co" Component="CheckBox1" class="rz-ms-2" />
-		</RadzenStack>
+            <RadzenCheckBox @bind-Value=@MostrarExtra Name="CheckBox1" />
+            <RadzenLabel Text="Alertar fogo e Co" Component="CheckBox1" class="rz-ms-2" />
+        </RadzenStack>
 
-		<!--Configuração de limpeza -->
-		<RadzenStack Orientation="Orientation.Horizontal" Gap="16px" AlignItems="AlignItems.Center" class="mt-3">
-			<RadzenLabel Text="Limpar após leituras" />
-			<RadzenNumeric TValue="int"
-						   @bind-Value="@limparApos"
-						   Placeholder="Limpar após"
-						   ShowUpDown="false"
-						   Style="max-width: 150px;" />
-		</RadzenStack>
-	</RadzenCard>
+        <!--Configuração de limpeza -->
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="16px" AlignItems="AlignItems.Center" class="mt-3">
+            <RadzenLabel Text="Limpar após leituras" />
+            <RadzenNumeric TValue="int"
+            @bind-Value="@limparApos"
+            Placeholder="Limpar após"
+            ShowUpDown="false"
+            Style="max-width: 150px;" />
+        </RadzenStack>
+    </RadzenCard>
 
-	<!-- Alerta -->
-	<div style="display: flex; flex-wrap: wrap; gap: 16px;">
-		@foreach (var alert in Alerts)
-		{
-			<div style="flex: 1 1 300px;">
-				<RadzenAlert Variant="@alert.Variant"
-							 AlertStyle="@alert.Style"
-							 Size="@alert.Size"
-							 Shade="@alert.Shade"
-							 Icon="@alert.icon"
-							 AllowClose="false">
-					@alert.message
-				</RadzenAlert>
-			</div>
-		}
-	</div>
+    <!-- Alerta -->
+    <div style="display: flex; flex-wrap: wrap; gap: 16px;">
+        @foreach (var alert in Alerts)
+        {
+            <div style="flex: 1 1 300px;">
+                <RadzenAlert Variant="@alert.Variant"
+                AlertStyle="@alert.Style"
+                Size="@alert.Size"
+                Shade="@alert.Shade"
+                Icon="@alert.icon"
+                AllowClose="false">
+                    @alert.message
+                </RadzenAlert>
+            </div>
+        }
+    </div>
 
+    <!-- Cards de Leituras com Tooltips e Booleanos -->
+    <RadzenCardGroup Responsive="@responsive" class="rz-mt-4 rz-gap-4">
+        @foreach (var card in MetricCards())
+        {
+            <RadzenCard load Variant="@variant" class="rz-shadow-md rz-rounded-xl rz-p-4 rz-bg-primary-light" id="@card.Label" MouseEnter="@(args => ShowTooltip(args, card.Tooltip))">
+                <RadzenStack Orientation="Orientation.Horizontal"
+                JustifyContent="JustifyContent.SpaceBetween"
+                AlignItems="AlignItems.Center">
+                    <RadzenStack>
+                        <RadzenText TextStyle="TextStyle.H6">@card.Label</RadzenText>
+                        @card.ValueContent
+                    </RadzenStack>
+                    <RadzenIcon Icon="@card.Icon" Style="font-size: 2rem; color: var(--rz-primary);" />
+                </RadzenStack>
+            </RadzenCard>
+        }
+    </RadzenCardGroup>
 
-	<!-- Cards de Leituras com Tooltips e Booleanos -->
-	<RadzenCardGroup Responsive="@responsive" class="rz-mt-4 rz-gap-4">
-		@foreach (var card in MetricCards())
-		{
-			<RadzenCard load Variant="@variant" class="rz-shadow-md rz-rounded-xl rz-p-4 rz-bg-primary-light" id="@card.Label" MouseEnter="@(args => ShowTooltip(args, card.Tooltip))">
-				<RadzenStack Orientation="Orientation.Horizontal"
-							 JustifyContent="JustifyContent.SpaceBetween"
-							 AlignItems="AlignItems.Center">
-					<RadzenStack>
-						<RadzenText TextStyle="TextStyle.H6">@card.Label</RadzenText>
-						@card.ValueContent
-					</RadzenStack>
-					<RadzenIcon Icon="@card.Icon" Style="font-size: 2rem; color: var(--rz-primary);" />
-				</RadzenStack>
-			</RadzenCard>
-		}
-	</RadzenCardGroup>
+    <!-- Botão para limpar -->
+    <RadzenStack JustifyContent="JustifyContent.End" class="rz-my-2">
+        <RadzenButton Text="Limpar"
+        Icon="clear"
+        Click="@Limpar"
+        ButtonStyle="ButtonStyle.Primary"
+        IsBusy="@limpando" />
+    </RadzenStack>
 
-	<!-- Botão para limpar -->
-	<RadzenStack JustifyContent="JustifyContent.End" class="rz-my-2">
-		<RadzenButton Text="Limpar"
-					  Icon="clear"
-					  Click="@Limpar"
-					  ButtonStyle="ButtonStyle.Primary"
-					  IsBusy="@limpando" />
-	</RadzenStack>
-
-	<!-- Grid -->
-	<RadzenDataGrid Data="@Leituras"
-					TItem="Valores"
-					Density="@density"
-					AllowPaging="true"
-					AllowColumnReorder="true"
-					AllowColumnResize="true"
-					AllowSorting="true"
-					AllowMultiColumnSorting="true"
-					ShowMultiColumnSortingIndex="true"
-					EmptyText="Nenhuma leitura realizada"
-					ShowPagingSummary="true">
-		<Columns>
-			<RadzenDataGridColumn Property="@nameof(Valores.LeituraEm)" Title="Leitura em" TextAlign="TextAlign.Center" SortOrder="SortOrder.Descending" OrderIndex="1" />
-			<RadzenDataGridColumn Property="@nameof(Valores.temperatura)" Title="Temperatura" TextAlign="TextAlign.Center" />
-			<RadzenDataGridColumn Property="@nameof(Valores.umidade)" Title="Umidade" TextAlign="TextAlign.Center" />
-			<RadzenDataGridColumn Property="@nameof(Valores.ppm_MQ2)" Title="PPM" TextAlign="TextAlign.Center" />
-			<RadzenDataGridColumn Property="@nameof(Valores.chamaDetectada)" Title="Chama / Fogo detectado" TextAlign="TextAlign.Center">
-				<Template Context="valor">
-					<RadzenIcon Icon="@(valor.chamaDetectada ? "check_circle" : "cancel")"
-								Style="@(valor.chamaDetectada ? "color:green;" : "color:red;")" />
-				</Template>
-			</RadzenDataGridColumn>
-			<RadzenDataGridColumn Property="@nameof(Valores.coDetectado)" Title="Monóxido de carbono detectado" TextAlign="TextAlign.Center">
-				<Template Context="valor">
-					<RadzenIcon Icon="@(valor.coDetectado ? "check_circle" : "cancel")"
-								Style="@(valor.coDetectado ? "color:green;" : "color:red;")" />
-				</Template>
-			</RadzenDataGridColumn>
-		</Columns>
-	</RadzenDataGrid>
+    <!-- Grid -->
+    <RadzenDataGrid Data="@Leituras"
+    TItem="Valores"
+    Density="@density"
+    AllowPaging="true"
+    AllowColumnReorder="true"
+    AllowColumnResize="true"
+    AllowSorting="true"
+    AllowMultiColumnSorting="true"
+    ShowMultiColumnSortingIndex="true"
+    EmptyText="Nenhuma leitura realizada"
+    ShowPagingSummary="true">
+        <Columns>
+            <RadzenDataGridColumn Property="@nameof(Valores.LeituraEm)" Title="Leitura em" TextAlign="TextAlign.Center" SortOrder="SortOrder.Descending" OrderIndex="1" />
+            <RadzenDataGridColumn Property="@nameof(Valores.temperatura)" Title="Temperatura" TextAlign="TextAlign.Center" />
+            <RadzenDataGridColumn Property="@nameof(Valores.umidade)" Title="Umidade" TextAlign="TextAlign.Center" />
+            <RadzenDataGridColumn Property="@nameof(Valores.ppm_MQ2)" Title="PPM" TextAlign="TextAlign.Center" />
+            <RadzenDataGridColumn Property="@nameof(Valores.chamaDetectada)" Title="Chama / Fogo detectado" TextAlign="TextAlign.Center">
+                <Template Context="valor">
+                    <RadzenIcon Icon="@(valor.chamaDetectada ? "check_circle" : "cancel")"
+                    Style="@(valor.chamaDetectada ? "color:green;" : "color:red;")" />
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn Property="@nameof(Valores.coDetectado)" Title="Monóxido de carbono detectado" TextAlign="TextAlign.Center">
+                <Template Context="valor">
+                    <RadzenIcon Icon="@(valor.coDetectado ? "check_circle" : "cancel")"
+                    Style="@(valor.coDetectado ? "color:green;" : "color:red;")" />
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
 </RadzenStack>
 
 <audio id="player">
-	<source id="playerSource" src="" />
+    <source id="playerSource" src="" />
 </audio>
 
 @code {
+    bool MostrarExtra = false;
+    bool responsive = true;
+    bool alertVisible = false;
+    List<Alerta> Alerts = [];
+    Variant variant = Variant.Filled;
+    Density density = Density.Compact;
+    bool limpando = false;
+    int limparApos = 7;
+    private List<Valores> _Leituras = [];
+    private IEnumerable<Valores> Leituras = [];
+    private Valores valorAtual = CriarValorAtualVazio();
+    private bool audioEnabled = false;
 
+    protected override void OnInitialized()
+    {
+        MqttMensagem.MensagemRecebida += OnMqttMensagemRecebida;
+    }
 
+    private async void OnMqttMensagemRecebida(object? sender, MensagemRecebidaEventArgs args)
+    {
+        try
+        {
+            if (args.Topico == "sensor/config") return;
 
+            await EnvioESP.EnviarValor(Random.Shared.Next(400).ToString());
+            valorAtual = JsonSerializer.Deserialize<Valores>(args.Mensagem);
 
+            if (valorAtual is not null)
+            {
+                const sbyte casasDecimais = 2;
 
+                valorAtual.LeituraEm = DateTime.Now;
+                valorAtual.temperatura = Math.Round(valorAtual.temperatura, casasDecimais);
+                valorAtual.umidade = Math.Round(valorAtual.umidade, casasDecimais);
+                valorAtual.ppm_MQ2 = Math.Round(valorAtual.ppm_MQ2, casasDecimais);
 
-	bool MostrarExtra = false;
-	public record Alerta(Variant Variant, AlertStyle Style, AlertSize Size, Shade Shade, string icon, string message);
+                VerificarRiscoPerigo(valorAtual);
 
-	bool responsive = true;
-	bool alertVisible = false;
+                _Leituras.Add(valorAtual);
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Warning, "Aviso", "Valor de leitura inválido recebido, verifique.", closeOnClick: true);
+            }
 
-	List<Alerta> Alerts = [];
-	Variant variant = Variant.Filled;
-	Density density = Density.Compact;
-	bool limpando = false;
-	int limparApos = 7;
-	private List<Valores> _Leituras = [];
-	private IEnumerable<Valores> Leituras = [];
-	private Valores valorAtual = CriarValorAtualVazio();
-	private bool audioEnabled = false;
+            if (_Leituras.Count >= limparApos) _Leituras.Clear();
 
+            Leituras = _Leituras.ToList();
 
-	protected override void OnInitialized()
-	{
-		_Leituras = [];
-		MqttMensagem.MensagemRecebida += OnMqttMensagemRecebida;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Erro", "Erro ao processar a mensagem recebida.", closeOnClick: true);
+            Console.WriteLine($"Erro ao processar mensagem MQTT: {ex.Message}");
+        }
+    }
+    private void Limpar()
+    {
+        limpando = true;
+        valorAtual = CriarValorAtualVazio();
+        _Leituras.Clear();
+        Leituras = [];
+        limpando = false;
+    }
+    private IEnumerable<(string Label, RenderFragment ValueContent, string Icon, string? Tooltip)> MetricCards()
+    {
+        RenderFragment CheckIcon(bool value) => builder =>
+        {
+            builder.OpenComponent<RadzenIcon>(0);
+            builder.AddAttribute(1, "Icon", value ? "check_circle" : "cancel");
+            builder.AddAttribute(2, "Style", $"color: {(value ? "green" : "red")}; font-size: 1.5rem;");
+            builder.CloseComponent();
+        };
 
-		// Task.Run(() => MqttConfig.ConfigureFaker());
-	}
+        return new[]
+        {
+            ("Temperatura", @<RadzenText>@($"{valorAtual.temperatura:F2} °C")</RadzenText>, "device_thermostat", null),
+            ("Umidade", @<RadzenText>@($"{valorAtual.umidade:F2} %")</RadzenText>, "water_drop", null),
+            ("PPM", @<RadzenText>@($"{valorAtual.ppm_MQ2:F2}")</RadzenText>, "labs", "Parte por milhão de concentração de gases."),
+            ("Chama / Fogo", CheckIcon(valorAtual.chamaDetectada), "local_fire_department", "Detecção de chama ou fogo."),
+            ("Monóxido de carbono", CheckIcon(valorAtual.coDetectado), "warning", "Detecção de monóxido de carbono."),
+        };
+    }
+    void ShowTooltip(ElementReference elementReference, string? text, TooltipOptions? options = null)
+    {
+        if (options is null)
+        {
+            options = new TooltipOptions()
+                {
+                    Position = TooltipPosition.Top,
+                };
+        }
+        if (!string.IsNullOrEmpty(text)) tooltipService.Open(elementReference, text, options);
+    }
+    private static Valores CriarValorAtualVazio()
+    {
+        return new Valores()
+            {
+                chamaDetectada = false,
+                coDetectado = false,
+                ppm_MQ2 = 0,
+                temperatura = 0,
+                umidade = 0,
+                valorAnalogico_MQ2 = 0
+            };
+    }
+    private void VerificarRiscoPerigo(Valores valores)
+    {
+        // Referência: https://pubs.aip.org/aip/acp/article-abstract/2431/1/090004/2906139/Home-fire-early-warning-system-using-flame-smoke
+        NotificationSeverity riscoPerigo = NotificationSeverity.Info;
+        bool temPerigo = false;
 
+        Alerts.Clear();
 
-	private async void OnMqttMensagemRecebida(object? sender, MensagemRecebidaEventArgs args)
-	{
-		try
-		{
-			if (args.Topico == "sensor/config") return;
+        if (valores.chamaDetectada && MostrarExtra)
+        {
+            temPerigo = true;
+            riscoPerigo = NotificationSeverity.Error;
+            Alerts.Add(new Alerta(Variant.Filled, AlertStyle.Danger, AlertSize.Large, Shade.Default, "dangerous", "Fogo detectado."));
+        }
+        if (valores.coDetectado && MostrarExtra)
+        {
+            temPerigo = true;
+            riscoPerigo = NotificationSeverity.Error;
+            Alerts.Add(new Alerta(Variant.Filled, AlertStyle.Danger, AlertSize.Large, Shade.Default, "dangerous", "Monóxido de carbono detectado."));
+        }
+        if (valores.temperatura > 45 || valores.ppm_MQ2 > 700 && !valores.chamaDetectada)
+        {
+            temPerigo = true;
+            riscoPerigo = NotificationSeverity.Warning;
+            Alerts.Add(new Alerta(Variant.Filled, AlertStyle.Warning, AlertSize.Large, Shade.Default, "warning", "Ambiente em potencial risco, verifique."));
+        }
+        // danger It is dangerous if the temperature sensor detects a temperature above 45°C or the smoke sensor detects smoke levels above 700 ppm and the flame sensor detect fire.
+        else if (valores.temperatura > 45 || valores.ppm_MQ2 > 700 && valores.chamaDetectada && !MostrarExtra)
+        {
+            temPerigo = true;
+            riscoPerigo = NotificationSeverity.Error;
+            Alerts.Add(new Alerta(Variant.Filled, AlertStyle.Danger, AlertSize.Large, Shade.Default, "dangerous", "Alto risco de incêndio, verifique imediatamente."));
+        }
 
-			await EnvioESP.EnviarValor(Random.Shared.Next(400).ToString());
-			valorAtual = JsonSerializer.Deserialize<Valores>(args.Mensagem);
-
-			if (valorAtual is not null)
-			{
-				const sbyte casasDecimais = 2;
-
-				valorAtual.LeituraEm = DateTime.Now;
-				valorAtual.temperatura = Math.Round(valorAtual.temperatura, casasDecimais);
-				valorAtual.umidade = Math.Round(valorAtual.umidade, casasDecimais);
-				valorAtual.ppm_MQ2 = Math.Round(valorAtual.ppm_MQ2, casasDecimais);
-
-				VerificarRiscoPerigo(valorAtual);
-
-				_Leituras.Add(valorAtual);
-			}
-			else
-			{
-				NotificationService.Notify(NotificationSeverity.Warning, "Aviso", "Valor de leitura inválido recebido, verifique.", closeOnClick: true);
-			}
-
-			if (_Leituras.Count >= limparApos) _Leituras.Clear();
-
-			Leituras = _Leituras.ToList();
-
-			await InvokeAsync(StateHasChanged);
-		}
-		catch (Exception ex)
-		{
-			NotificationService.Notify(NotificationSeverity.Error, "Erro", "Erro ao processar a mensagem recebida.", closeOnClick: true);
-			Console.WriteLine($"Erro ao processar mensagem MQTT: {ex.Message}");
-		}
-	}
-
-	private void Limpar()
-	{
-		limpando = true;
-		valorAtual = CriarValorAtualVazio();
-		_Leituras.Clear();
-		Leituras = [];
-		limpando = false;
-	}
-
-	private IEnumerable<(string Label, RenderFragment ValueContent, string Icon, string? Tooltip)> MetricCards()
-	{
-		RenderFragment CheckIcon(bool value) => builder =>
-		{
-			builder.OpenComponent<RadzenIcon>(0);
-			builder.AddAttribute(1, "Icon", value ? "check_circle" : "cancel");
-			builder.AddAttribute(2, "Style", $"color: {(value ? "green" : "red")}; font-size: 1.5rem;");
-			builder.CloseComponent();
-		};
-
-		return new[]
-		{
-			("Temperatura", @<RadzenText>@($"{valorAtual.temperatura:F2} °C")</RadzenText>, "device_thermostat", null),
-			("Umidade", @<RadzenText>@($"{valorAtual.umidade:F2} %")</RadzenText>, "water_drop", null),
-			("PPM", @<RadzenText>@($"{valorAtual.ppm_MQ2:F2}")</RadzenText>, "labs", "Parte por milhão de concentração de gases."),
-			("Chama / Fogo", CheckIcon(valorAtual.chamaDetectada), "local_fire_department", "Detecção de chama ou fogo."),
-			("Monóxido de carbono", CheckIcon(valorAtual.coDetectado), "warning", "Detecção de monóxido de carbono."),
-		};
-	}
-
-	void ShowTooltip(ElementReference elementReference, string? text, TooltipOptions? options = null)
-	{
-		if (options is null)
-		{
-			options = new TooltipOptions()
-				{
-					Position = TooltipPosition.Top,
-				};
-		}
-		if (!string.IsNullOrEmpty(text)) tooltipService.Open(elementReference, text, options);
-	}
-
-	private static Valores CriarValorAtualVazio()
-	{
-		return new Valores()
-			{
-				chamaDetectada = false,
-				coDetectado = false,
-				ppm_MQ2 = 0,
-				temperatura = 0,
-				umidade = 0,
-				valorAnalogico_MQ2 = 0
-			};
-	}
-	private void VerificarRiscoPerigo(Valores valores)
-	{
-		// Referência: https://pubs.aip.org/aip/acp/article-abstract/2431/1/090004/2906139/Home-fire-early-warning-system-using-flame-smoke
-		NotificationSeverity riscoPerigo = NotificationSeverity.Info;
-		bool temPerigo = false;
-
-		Alerts.Clear();
-
-		if (valores.chamaDetectada && MostrarExtra)
-		{
-			temPerigo = true;
-			riscoPerigo = NotificationSeverity.Error;
-			Alerts.Add(new Alerta(Variant.Filled, AlertStyle.Danger, AlertSize.Large, Shade.Default, "dangerous", "Fogo detectado."));
-		}
-		if (valores.coDetectado && MostrarExtra)
-		{
-			temPerigo = true;
-			riscoPerigo = NotificationSeverity.Error;
-			Alerts.Add(new Alerta(Variant.Filled, AlertStyle.Danger, AlertSize.Large, Shade.Default, "dangerous", "Monóxido de carbono detectado."));
-		}
-		if (valores.temperatura > 45 || valores.ppm_MQ2 > 700 && !valores.chamaDetectada)
-		{
-			temPerigo = true;
-			riscoPerigo = NotificationSeverity.Warning;
-			Alerts.Add(new Alerta(Variant.Filled, AlertStyle.Warning, AlertSize.Large, Shade.Default, "warning", "Ambiente em potencial risco, verifique."));
-		}
-		// danger It is dangerous if the temperature sensor detects a temperature above 45°C or the smoke sensor detects smoke levels above 700 ppm and the flame sensor detect fire.
-		else if (valores.temperatura > 45 || valores.ppm_MQ2 > 700 && valores.chamaDetectada && !MostrarExtra)
-		{
-			temPerigo = true;
-			riscoPerigo = NotificationSeverity.Error;
-			Alerts.Add(new Alerta(Variant.Filled, AlertStyle.Danger, AlertSize.Large, Shade.Default, "dangerous", "Alto risco de incêndio, verifique imediatamente."));
-		}
-
-		if (temPerigo)
-		{
-			NotificationService.Notify(riscoPerigo, "Perigo", "Ambiente fora do normal", closeOnClick: true);
-		}
-	}
+        if (temPerigo)
+        {
+            NotificationService.Notify(riscoPerigo, "Perigo", "Ambiente fora do normal", closeOnClick: true);
+        }
+    }
 }
