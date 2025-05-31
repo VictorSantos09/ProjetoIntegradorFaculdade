@@ -1,0 +1,72 @@
+﻿@using Radzen
+@using Radzen.Blazor
+
+@typeparam TItem
+
+<RadzenStack class="rz-p-4 rz-p-md-6 rz-p-lg-12" Orientation="Orientation.Vertical">
+    <RadzenCard Variant="Variant.Outlined">
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                <RadzenCheckBox @bind-Value="@smooth" Name="smooth"></RadzenCheckBox>
+                <RadzenLabel Text="Smooth" Component="smooth" />
+            </RadzenStack>
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                <RadzenCheckBox @bind-Value="@showDataLabels" Name="dataLabels"></RadzenCheckBox>
+                <RadzenLabel Text="Show Data Labels" Component="dataLabels" />
+            </RadzenStack>
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                <RadzenCheckBox @bind-Value="@showMarkers" Name="markers"></RadzenCheckBox>
+                <RadzenLabel Text="Show Markers" Component="markers" />
+            </RadzenStack>
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                <RadzenCheckBox @bind-Value="@sharedTooltip" Name="sharedTooltip"></RadzenCheckBox>
+                <RadzenLabel Text="Shared Tooltip" Component="sharedTooltip" />
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenCard>
+
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 2rem;">
+        @foreach (var chart in Charts)
+        {
+            <div>
+                <h3>@chart.Title</h3>
+                <RadzenChart Style="height: 300px;">
+                    <RadzenChartTooltipOptions Shared="@sharedTooltip" />
+                    <RadzenLineSeries Data="@Data"
+                    CategoryProperty="Hora"
+                    ValueProperty="@chart.ValueProperty"
+                    Title="@chart.Title"
+                    Smooth="@smooth">
+                        <RadzenMarkers Visible="@showMarkers" MarkerType="@chart.MarkerType" />
+                        <RadzenSeriesDataLabels Visible="@showDataLabels" />
+                    </RadzenLineSeries>
+                    <RadzenValueAxis>
+                        <RadzenAxisTitle Text="@chart.Title" />
+                    </RadzenValueAxis>
+                </RadzenChart>
+            </div>
+        }
+    </div>
+</RadzenStack>
+
+@code {
+    [Parameter] public IEnumerable<TItem> Data { get; set; } = [];
+
+    private bool smooth = false;
+    private bool showDataLabels = false;
+    private bool showMarkers = false;
+    private bool sharedTooltip = false;
+    private string LoadLocation = "";
+    private string IsCacheData = "";
+
+    private List<ChartDefinition> Charts = new()
+    {
+        new ChartDefinition("Temperatura (°C)", "Temperatura"),
+        new ChartDefinition("Umidade (%)", "Umidade"),
+        new ChartDefinition("PPM", "PPM"),
+        new ChartDefinition("Fogo Detectado", "FogoDetectadoValor", MarkerType.Triangle),
+        new ChartDefinition("Monóxido Detectado", "MonoxidoDetectadoValor", MarkerType.Diamond),
+    };
+
+    private record ChartDefinition(string Title, string ValueProperty, MarkerType MarkerType = MarkerType.Circle);
+}

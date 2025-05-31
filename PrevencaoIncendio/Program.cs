@@ -5,6 +5,7 @@ using PrevencaoIncendio.Config.Ip;
 using PrevencaoIncendio.Data;
 using PrevencaoIncendio.Repositories;
 using Radzen;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +20,17 @@ builder.Services.AddTransient<IMongoClient>(sp =>
     var settings = MongoClientSettings.FromConnectionString(isProduction ? connectionStringPrd : connectionStringDev);
     settings.ServerApi = new ServerApi(ServerApiVersion.V1);
     return new MongoClient(settings);
+});
+builder.Services.AddTransient(sp =>
+{
+    //var configOptions = builder.Configuration.GetSection("ConnectionStrings:Redis").Get<ConfigurationOptions>() ?? throw new ApplicationException("Não foi possível conectar ao Redis");
+
+    var configOptions = new ConfigurationOptions()
+    {
+
+    };
+    ConnectionMultiplexer redis = ConnectionMultiplexer.Connect(configOptions);
+    return redis.GetDatabase();
 });
 builder.Services.AddTransient(sp =>
 {

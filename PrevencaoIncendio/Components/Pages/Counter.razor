@@ -3,109 +3,13 @@
 @using System.Globalization
 @using System.Text.Json
 @using PrevencaoIncendio.Repositories
+@using StackExchange.Redis
 @inject NotificationService NotificationService
+@inject IDatabase Cache
 
 <PageTitle>Gráficos</PageTitle>
 
-<RadzenStack class="rz-p-4 rz-p-md-6 rz-p-lg-12" Orientation="Orientation.Vertical">
-    <RadzenCard Variant="Variant.Outlined">
-        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
-            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                <RadzenCheckBox @bind-Value="@smooth" Name="smooth"></RadzenCheckBox>
-                <RadzenLabel Text="Smooth" Component="smooth" />
-            </RadzenStack>
-            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                <RadzenCheckBox @bind-Value="@showDataLabels" Name="dataLabels"></RadzenCheckBox>
-                <RadzenLabel Text="Show Data Labels" Component="dataLabels" />
-            </RadzenStack>
-            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                <RadzenCheckBox @bind-Value="@showMarkers" Name="markers"></RadzenCheckBox>
-                <RadzenLabel Text="Show Markers" Component="markers" />
-            </RadzenStack>
-            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                <RadzenCheckBox @bind-Value="@sharedTooltip" Name="sharedToltip"></RadzenCheckBox>
-                <RadzenLabel Text="Shared Tooltip" Component="sharedTooltip" />
-            </RadzenStack>
-        </RadzenStack>
-    </RadzenCard>
-
-    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 2rem;">
-        <!-- Temperatura -->
-        <div>
-            <h3>Temperatura (°C)</h3>
-            <RadzenChart Style="height: 300px;">
-                <RadzenChartTooltipOptions Shared="@sharedTooltip" />
-                <RadzenLineSeries Data="@Data" CategoryProperty="Hora" ValueProperty="Temperatura" Title="Temperatura" Smooth="@smooth">
-                    <RadzenMarkers Visible="@showMarkers" />
-                    <RadzenSeriesDataLabels Visible="@showDataLabels" />
-                </RadzenLineSeries>
-                <RadzenValueAxis>
-                    <RadzenAxisTitle Text="Temperatura (°C)" />
-                </RadzenValueAxis>
-            </RadzenChart>
-        </div>
-
-        <!-- Umidade -->
-        <div>
-            <h3>Umidade (%)</h3>
-            <RadzenChart Style="height: 300px;">
-                <RadzenChartTooltipOptions Shared="@sharedTooltip" />
-                <RadzenLineSeries Data="@Data" CategoryProperty="Hora" ValueProperty="Umidade" Title="Umidade" Smooth="@smooth">
-                    <RadzenMarkers Visible="@showMarkers" />
-                    <RadzenSeriesDataLabels Visible="@showDataLabels" />
-                </RadzenLineSeries>
-                <RadzenValueAxis>
-                    <RadzenAxisTitle Text="Umidade (%)" />
-                </RadzenValueAxis>
-            </RadzenChart>
-        </div>
-
-        <!-- PPM -->
-        <div>
-            <h3>PPM</h3>
-            <RadzenChart Style="height: 300px;">
-                <RadzenChartTooltipOptions Shared="@sharedTooltip" />
-                <RadzenLineSeries Data="@Data" CategoryProperty="Hora" ValueProperty="PPM" Title="PPM" Smooth="@smooth">
-                    <RadzenMarkers Visible="@showMarkers" />
-                    <RadzenSeriesDataLabels Visible="@showDataLabels" />
-                </RadzenLineSeries>
-                <RadzenValueAxis>
-                    <RadzenAxisTitle Text="PPM" />
-                </RadzenValueAxis>
-            </RadzenChart>
-        </div>
-
-        <!-- Fogo -->
-        <div>
-            <h3>Fogo Detectado</h3>
-            <RadzenChart Style="height: 300px;">
-                <RadzenChartTooltipOptions Shared="@sharedTooltip" />
-                <RadzenLineSeries Data="@Data" CategoryProperty="Hora" ValueProperty="FogoDetectadoValor" Title="Fogo Detectado" Smooth="@smooth">
-                    <RadzenMarkers Visible="@showMarkers" MarkerType="MarkerType.Triangle" />
-                    <RadzenSeriesDataLabels Visible="@showDataLabels" />
-                </RadzenLineSeries>
-                <RadzenValueAxis>
-                    <RadzenAxisTitle Text="Fogo Detectado" />
-                </RadzenValueAxis>
-            </RadzenChart>
-        </div>
-
-        <!-- Monóxido -->
-        <div>
-            <h3>Monóxido Detectado</h3>
-            <RadzenChart Style="height: 300px;">
-                <RadzenChartTooltipOptions Shared="@sharedTooltip" />
-                <RadzenLineSeries Data="@Data" CategoryProperty="Hora" ValueProperty="MonoxidoDetectadoValor" Title="Monóxido Detectado" Smooth="@smooth">
-                    <RadzenMarkers Visible="@showMarkers" MarkerType="MarkerType.Diamond" />
-                    <RadzenSeriesDataLabels Visible="@showDataLabels" />
-                </RadzenLineSeries>
-                <RadzenValueAxis>
-                    <RadzenAxisTitle Text="Monóxido Detectado" />
-                </RadzenValueAxis>
-            </RadzenChart>
-        </div>
-    </div>
-</RadzenStack>
+<SensorChartPanel Data="Data"/>
 
 @code {
     class SensorData
@@ -136,14 +40,17 @@
 
     protected override async Task OnInitializedAsync()
     {
-
-        var valores = await _valoresRepository.GetLastMinutesGroupedAsync(60);
+        string recordKey = $"SensorData_1";
+        var valores = await Cache.GetRecordAsync<IEnumerable<Valores>>(recordKey) ?? [];
         await ProcessarDadosPorMinuto(valores);
     }
 
     private async Task ProcessarDadosPorMinuto(IEnumerable<Valores> valores)
     {
-        if (!valores.Any()) return;
+        if (!valores.Any()) {
+			valores = await _valoresRepository.GetLastMinutesGroupedAsync(60);
+			await Cache.SetRecordAsync("SensorData_1", valores);
+        }
 
         DataList.Clear();
 
@@ -165,5 +72,4 @@
         Data = DataList;
         await InvokeAsync(StateHasChanged);
     }
-
 }
