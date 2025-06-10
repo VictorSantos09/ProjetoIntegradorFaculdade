@@ -1,0 +1,36 @@
+﻿@page "/graficos"
+@rendermode InteractiveServer
+@inject NotificationService NotificationService
+@inject IDatabase Cache
+
+<PageTitle>Gráficos</PageTitle>
+
+<SensorChartPanel  />
+
+@code {
+    bool smooth = false;
+    bool sharedTooltip = true;
+    bool showDataLabels = true;
+    bool showMarkers = true;
+
+    private readonly IValoresRepository _valoresRepository;
+
+    public Grafico(IValoresRepository valoresRepository)
+    {
+        _valoresRepository = valoresRepository;
+    }
+
+    private async Task OnGraficoReady()
+    {
+        try
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            throw;
+        }
+    }
+
+}

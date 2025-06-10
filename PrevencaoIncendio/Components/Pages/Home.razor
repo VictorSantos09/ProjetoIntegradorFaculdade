@@ -1,14 +1,13 @@
 ﻿@page "/"
 @using System.Text.Json
+@using PrevencaoIncendio.Mqtt
 @rendermode InteractiveServer
 @inject TooltipService tooltipService
 @inject NotificationService NotificationService
-@inject IJSRuntime JS
 
 <PageTitle>Inicio</PageTitle>
 
 <RadzenStack Gap="20px">
-
     <!-- Configuração de Estilo -->
     <RadzenCard Variant="Variant.Outlined" class="rz-shadow-lg rz-rounded-lg p-4">
         <RadzenStack Orientation="Orientation.Horizontal" Gap="16px" AlignItems="AlignItems.Center">
@@ -16,20 +15,20 @@
 
             <!-- SelectBar visível apenas em telas grandes -->
             <RadzenSelectBar @bind-Value="@density"
-            TextProperty="Text"
-            ValueProperty="Value"
-            Data="@(Enum.GetValues(typeof(Density)).Cast<Density>().Select(t => new { Text = t.ToString(), Value = t }))"
-            Size="ButtonSize.Medium"
-            Style="max-width: 300px;"
-            class="rz-display-none rz-display-xl-flex" />
+                             TextProperty="Text"
+                             ValueProperty="Value"
+                             Data="@(Enum.GetValues(typeof(Density)).Cast<Density>().Select(t => new { Text = t.ToString(), Value = t }))"
+                             Size="ButtonSize.Medium"
+                             Style="max-width: 300px;"
+                             class="rz-display-none rz-display-xl-flex" />
 
             <!-- DropDown visível em telas menores -->
             <RadzenDropDown @bind-Value="@density"
-            TextProperty="Text"
-            ValueProperty="Value"
-            Data="@(Enum.GetValues(typeof(Density)).Cast<Density>().Select(t => new { Text = t.ToString(), Value = t }))"
-            Style="max-width: 300px;"
-            class="rz-display-inline-flex rz-display-xl-none" />
+                            TextProperty="Text"
+                            ValueProperty="Value"
+                            Data="@(Enum.GetValues(typeof(Density)).Cast<Density>().Select(t => new { Text = t.ToString(), Value = t }))"
+                            Style="max-width: 300px;"
+                            class="rz-display-inline-flex rz-display-xl-none" />
 
             <RadzenCheckBox @bind-Value=@MostrarExtra Name="CheckBox1" />
             <RadzenLabel Text="Alertar fogo e Co" Component="CheckBox1" class="rz-ms-2" />
@@ -39,10 +38,10 @@
         <RadzenStack Orientation="Orientation.Horizontal" Gap="16px" AlignItems="AlignItems.Center" class="mt-3">
             <RadzenLabel Text="Limpar após leituras" />
             <RadzenNumeric TValue="int"
-            @bind-Value="@limparApos"
-            Placeholder="Limpar após"
-            ShowUpDown="false"
-            Style="max-width: 150px;" />
+                           @bind-Value="@limparApos"
+                           Placeholder="Limpar após"
+                           ShowUpDown="false"
+                           Style="max-width: 150px;" />
         </RadzenStack>
     </RadzenCard>
 
@@ -52,11 +51,11 @@
         {
             <div style="flex: 1 1 300px;">
                 <RadzenAlert Variant="@alert.Variant"
-                AlertStyle="@alert.Style"
-                Size="@alert.Size"
-                Shade="@alert.Shade"
-                Icon="@alert.icon"
-                AllowClose="false">
+                             AlertStyle="@alert.Style"
+                             Size="@alert.Size"
+                             Shade="@alert.Shade"
+                             Icon="@alert.icon"
+                             AllowClose="false">
                     @alert.message
                 </RadzenAlert>
             </div>
@@ -69,8 +68,8 @@
         {
             <RadzenCard load Variant="@variant" class="rz-shadow-md rz-rounded-xl rz-p-4 rz-bg-primary-light" id="@card.Label" MouseEnter="@(args => ShowTooltip(args, card.Tooltip))">
                 <RadzenStack Orientation="Orientation.Horizontal"
-                JustifyContent="JustifyContent.SpaceBetween"
-                AlignItems="AlignItems.Center">
+                             JustifyContent="JustifyContent.SpaceBetween"
+                             AlignItems="AlignItems.Center">
                     <RadzenStack>
                         <RadzenText TextStyle="TextStyle.H6">@card.Label</RadzenText>
                         @card.ValueContent
@@ -84,24 +83,24 @@
     <!-- Botão para limpar -->
     <RadzenStack JustifyContent="JustifyContent.End" class="rz-my-2">
         <RadzenButton Text="Limpar"
-        Icon="clear"
-        Click="@Limpar"
-        ButtonStyle="ButtonStyle.Primary"
-        IsBusy="@limpando" />
+                      Icon="clear"
+                      Click="@Limpar"
+                      ButtonStyle="ButtonStyle.Primary"
+                      IsBusy="@limpando" />
     </RadzenStack>
 
     <!-- Grid -->
     <RadzenDataGrid Data="@Leituras"
-    TItem="Valores"
-    Density="@density"
-    AllowPaging="true"
-    AllowColumnReorder="true"
-    AllowColumnResize="true"
-    AllowSorting="true"
-    AllowMultiColumnSorting="true"
-    ShowMultiColumnSortingIndex="true"
-    EmptyText="Nenhuma leitura realizada"
-    ShowPagingSummary="true">
+                    TItem="Valores"
+                    Density="@density"
+                    AllowPaging="true"
+                    AllowColumnReorder="true"
+                    AllowColumnResize="true"
+                    AllowSorting="true"
+                    AllowMultiColumnSorting="true"
+                    ShowMultiColumnSortingIndex="true"
+                    EmptyText="Nenhuma leitura realizada"
+                    ShowPagingSummary="true">
         <Columns>
             <RadzenDataGridColumn Property="@nameof(Valores.LeituraEm)" Title="Leitura em" TextAlign="TextAlign.Center" SortOrder="SortOrder.Descending" OrderIndex="1" />
             <RadzenDataGridColumn Property="@nameof(Valores.temperatura)" Title="Temperatura" TextAlign="TextAlign.Center" />
@@ -110,22 +109,18 @@
             <RadzenDataGridColumn Property="@nameof(Valores.chamaDetectada)" Title="Chama / Fogo detectado" TextAlign="TextAlign.Center">
                 <Template Context="valor">
                     <RadzenIcon Icon="@(valor.chamaDetectada ? "check_circle" : "cancel")"
-                    Style="@(valor.chamaDetectada ? "color:green;" : "color:red;")" />
+                                Style="@(valor.chamaDetectada ? "color:green;" : "color:red;")" />
                 </Template>
             </RadzenDataGridColumn>
             <RadzenDataGridColumn Property="@nameof(Valores.coDetectado)" Title="Monóxido de carbono detectado" TextAlign="TextAlign.Center">
                 <Template Context="valor">
                     <RadzenIcon Icon="@(valor.coDetectado ? "check_circle" : "cancel")"
-                    Style="@(valor.coDetectado ? "color:green;" : "color:red;")" />
+                                Style="@(valor.coDetectado ? "color:green;" : "color:red;")" />
                 </Template>
             </RadzenDataGridColumn>
         </Columns>
     </RadzenDataGrid>
 </RadzenStack>
-
-<audio id="player">
-    <source id="playerSource" src="" />
-</audio>
 
 @code {
     bool MostrarExtra = false;
@@ -145,7 +140,6 @@
     {
         MqttMensagem.MensagemRecebida += OnMqttMensagemRecebida;
     }
-
     private async void OnMqttMensagemRecebida(object? sender, MensagemRecebidaEventArgs args)
     {
         try

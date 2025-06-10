@@ -5,28 +5,7 @@ using PrevencaoIncendio.Config.Ip;
 using PrevencaoIncendio.Models;
 using PrevencaoIncendio.Repositories;
 
-namespace PrevencaoIncendio;
-
-public class MensagemRecebidaEventArgs : EventArgs
-{
-    public string Topico { get; set; }
-    public string Mensagem { get; set; }
-
-    public MensagemRecebidaEventArgs(string tópico, string mensagem)
-    {
-        Topico = tópico;
-        Mensagem = mensagem;
-    }
-}
-public static class MqttMensagem
-{
-    public static event EventHandler<MensagemRecebidaEventArgs>? MensagemRecebida;
-
-    public static void OnMensagemRecebida(string topico, string mensagem)
-    {
-        MensagemRecebida?.Invoke(null, new MensagemRecebidaEventArgs(topico, mensagem));
-    }
-}
+namespace PrevencaoIncendio.Mqtt;
 public class MqttConfig
 {
     public static readonly MqttClientFactory Factory = new();
@@ -59,7 +38,7 @@ public class MqttConfig
         //var jsonString = JsonSerializer.Serialize(valores);
 
         //MqttMensagem.OnMensagemRecebida("sensor/#", jsonString);
-    } 
+    }
     #endregion
     public static async Task Configure(IValoresRepository valoresRepository, IOptions<IpAddress> ipAddress)
     {
@@ -81,7 +60,6 @@ public class MqttConfig
                 try
                 {
                     var valores = JsonSerializer.Deserialize<Valores>(payloadString);
-
                     if (valores is not null)
                     {
                         await valoresRepository.InsertOne(valores);

@@ -1,6 +1,6 @@
 ﻿using MQTTnet;
 
-namespace PrevencaoIncendio;
+namespace PrevencaoIncendio.Mqtt;
 
 public class EnvioESP
 {
