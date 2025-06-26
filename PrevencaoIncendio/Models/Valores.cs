@@ -10,7 +10,7 @@ public class Valores
     public int valorAnalogico_MQ2 { get; set; }
     public double ppm_MQ2 { get; set; }
     public bool chamaDetectada { get; set; }
-    public double temperatura { get; set; }
+    public float temperatura { get; set; }
     public double umidade { get; set; }
     public bool coDetectado { get; set; }
     public DateTime LeituraEm { get; set; }

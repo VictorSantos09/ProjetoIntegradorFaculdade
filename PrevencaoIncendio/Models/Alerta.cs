@@ -10,4 +10,10 @@ public enum AlertLevel
     Warning,
     Danger,
     Info,
+    MediaFire,
+    MediaCo,
+    MediaTemperatura,
+    MediaUmidade,
+    MediaPpm,
+    MediaInfo,
 }

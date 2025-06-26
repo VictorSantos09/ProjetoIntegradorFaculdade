@@ -92,7 +92,7 @@ public class ValoresRepository : Repository, IValoresRepository
             return new Valores
             {
                 LeituraEm = d["LeituraMaisRecente"].ToUniversalTime(),
-                temperatura = d.GetValue("TemperaturaMedia", 0).ToDouble(),
+                temperatura = ((float)d.GetValue("TemperaturaMedia", 0).ToDouble()),
                 umidade = d.GetValue("UmidadeMedia", 0).ToDouble(),
                 ppm_MQ2 = d.GetValue("FumacaMedia", 0).ToDouble(),
                 coDetectado = d.GetValue("CO2Media", 0).ToDouble() >= 0.5,

@@ -93,12 +93,11 @@ public static class ConfigureAplication
         services.AddTransient(options =>
         {
             var dangerParameters = configuration.GetSection("DangerParameters").Get<DangerParameters>();
-            if (dangerParameters is null)
-            {
-                throw new InvalidOperationException("DangerParameters não configurado corretamente.");
-            }
+            dangerParameters?.VerificarValores();
 
-            return dangerParameters;
+            return dangerParameters is null
+                ? throw new InvalidOperationException("DangerParameters não configurado corretamente.")
+                : dangerParameters;
         });
     }
 }
