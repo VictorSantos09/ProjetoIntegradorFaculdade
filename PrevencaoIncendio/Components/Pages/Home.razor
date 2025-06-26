@@ -1,9 +1,13 @@
 ﻿@page "/"
-@using System.Text.Json
-@using PrevencaoIncendio.Mqtt
 @rendermode InteractiveServer
+@using System.Text.Json
+@using Microsoft.Extensions.Options
+@using PrevencaoIncendio.Mqtt
+@using System.Timers
 @inject TooltipService tooltipService
 @inject NotificationService NotificationService
+@inject DangerParameters dangerParameters
+@inject IValoresRepository ValoresRepository
 
 <PageTitle>Inicio</PageTitle>
 
@@ -45,6 +49,7 @@
         </RadzenStack>
     </RadzenCard>
 
+
     <!-- Alerta -->
     <div style="display: flex; flex-wrap: wrap; gap: 16px;">
         @foreach (var alert in Alerts)
@@ -55,7 +60,7 @@
                              Size="@alert.Size"
                              Shade="@alert.Shade"
                              Icon="@alert.icon"
-                             AllowClose="false">
+                             AllowClose="true">
                     @alert.message
                 </RadzenAlert>
             </div>
@@ -66,7 +71,7 @@
     <RadzenCardGroup Responsive="@responsive" class="rz-mt-4 rz-gap-4">
         @foreach (var card in MetricCards())
         {
-            <RadzenCard load Variant="@variant" class="rz-shadow-md rz-rounded-xl rz-p-4 rz-bg-primary-light" id="@card.Label" MouseEnter="@(args => ShowTooltip(args, card.Tooltip))">
+            <RadzenCard load Variant="@variant" class="rz-shadow-md rz-rounded-xl rz-p-4" id="@card.Label" MouseEnter="@(args => ShowTooltip(args, card.Tooltip))">
                 <RadzenStack Orientation="Orientation.Horizontal"
                              JustifyContent="JustifyContent.SpaceBetween"
                              AlignItems="AlignItems.Center">
@@ -75,6 +80,26 @@
                         @card.ValueContent
                     </RadzenStack>
                     <RadzenIcon Icon="@card.Icon" Style="font-size: 2rem; color: var(--rz-primary);" />
+                </RadzenStack>
+            </RadzenCard>
+        }
+    </RadzenCardGroup>
+
+    <RadzenCardGroup Responsive="@responsive" class="rz-mt-4 rz-gap-4">
+        @foreach (var card in MetricCardsMedias())
+        {
+            <RadzenCard load Variant="@variant"
+                        Style="background-color: var(--rz-base); color: var(--rz-base-900);"
+                        class="rz-shadow-md rz-rounded-xl rz-p-4" id="@card.Label"
+                        MouseEnter="@(args => ShowTooltip(args, card.Tooltip))">
+                <RadzenStack Orientation="Orientation.Horizontal"
+                             JustifyContent="JustifyContent.SpaceBetween"
+                             AlignItems="AlignItems.Center">
+                    <RadzenStack>
+                        <RadzenText TextStyle="TextStyle.H6">@card.Label</RadzenText>
+                        @card.ValueContent
+                    </RadzenStack>
+                    <RadzenIcon Icon="@card.Icon" Style="font-size: 2rem; color: var(--rz-secondary);" />
                 </RadzenStack>
             </RadzenCard>
         }
@@ -123,30 +148,45 @@
 </RadzenStack>
 
 @code {
-    bool MostrarExtra = false;
+    bool MostrarExtra = true;
     bool responsive = true;
     bool alertVisible = false;
     List<Alerta> Alerts = [];
     Variant variant = Variant.Filled;
     Density density = Density.Compact;
     bool limpando = false;
-    int limparApos = 7;
+    int limparApos = 100;
     private List<Valores> _Leituras = [];
     private IEnumerable<Valores> Leituras = [];
     private Valores valorAtual = CriarValorAtualVazio();
-    private bool audioEnabled = false;
+    private Valores valorMedia = CriarValorAtualVazio();
+    private Timer _timer;
 
     protected override void OnInitialized()
     {
         MqttMensagem.MensagemRecebida += OnMqttMensagemRecebida;
+
+        _timer = new Timer(2000);
+        _timer.AutoReset = true;
+        _timer.Enabled = true;
+
+        _timer.Elapsed += async (sender, args) =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await BuscarMediaValoresAsync();
+                StateHasChanged();
+            });
+        };
+        _ = BuscarMediaValoresAsync();
     }
+
     private async void OnMqttMensagemRecebida(object? sender, MensagemRecebidaEventArgs args)
     {
         try
         {
             if (args.Topico == "sensor/config") return;
 
-            await EnvioESP.EnviarValor(Random.Shared.Next(400).ToString());
             valorAtual = JsonSerializer.Deserialize<Valores>(args.Mensagem);
 
             if (valorAtual is not null)
@@ -159,6 +199,7 @@
                 valorAtual.ppm_MQ2 = Math.Round(valorAtual.ppm_MQ2, casasDecimais);
 
                 VerificarRiscoPerigo(valorAtual);
+                VerificarRiscoPerigoMedia();
 
                 _Leituras.Add(valorAtual);
             }
@@ -179,6 +220,34 @@
             Console.WriteLine($"Erro ao processar mensagem MQTT: {ex.Message}");
         }
     }
+
+    private async Task BuscarMediaValoresAsync()
+    {
+        try
+        {
+            var valor = await ValoresRepository.GetNextHourAveragesAsync(DateTime.Now.AddDays(-1), DateTime.Now.AddDays(-1));
+            if (valor is not null)
+            {
+                valorMedia = valor;
+                VerificarRiscoPerigo(valorMedia);
+            }
+            else
+            {
+                const string mensagemSemLeituraPeriodo = "Nenhuma leitura encontrada para o período selecionado.";
+
+                if (!Alerts.Any(x => x.message == mensagemSemLeituraPeriodo))
+                    Alerts.Add(new Alerta(Variant.Filled, AlertStyle.Info, AlertSize.Large, Shade.Default, "info", mensagemSemLeituraPeriodo, AlertLevel.Info));
+
+                valorMedia = CriarValorAtualVazio();
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Erro", "Erro ao consultar os dados.", closeOnClick: true);
+            Console.WriteLine($"Erro ao consultar dados: {ex.Message}");
+        }
+    }
+
     private void Limpar()
     {
         limpando = true;
@@ -200,72 +269,127 @@
         return new[]
         {
             ("Temperatura", @<RadzenText>@($"{valorAtual.temperatura:F2} °C")</RadzenText>, "device_thermostat", null),
-            ("Umidade", @<RadzenText>@($"{valorAtual.umidade:F2} %")</RadzenText>, "water_drop", null),
-            ("PPM", @<RadzenText>@($"{valorAtual.ppm_MQ2:F2}")</RadzenText>, "labs", "Parte por milhão de concentração de gases."),
-            ("Chama / Fogo", CheckIcon(valorAtual.chamaDetectada), "local_fire_department", "Detecção de chama ou fogo."),
+        ("Umidade", @<RadzenText>@($"{valorAtual.umidade:F2} %")</RadzenText>, "water_drop", null),
+        ("PPM", @<RadzenText>@($"{valorAtual.ppm_MQ2:F2}")</RadzenText>, "labs", "Parte por milhão de concentração de gases."),
+        ("Chama / Fogo", CheckIcon(valorAtual.chamaDetectada), "local_fire_department", "Detecção de chama ou fogo."),
             ("Monóxido de carbono", CheckIcon(valorAtual.coDetectado), "warning", "Detecção de monóxido de carbono."),
+        }
+    ;
+}
+private IEnumerable<(string Label, RenderFragment ValueContent, string Icon, string? Tooltip)> MetricCardsMedias()
+{
+    RenderFragment CheckIcon(bool value) => builder =>
+    {
+        builder.OpenComponent<RadzenIcon>(0);
+        builder.AddAttribute(1, "Icon", value ? "check_circle" : "cancel");
+        builder.AddAttribute(2, "Style", $"color: {(value ? "green" : "red")}; font-size: 1.5rem;");
+        builder.CloseComponent();
+    };
+
+    return new[]
+    {
+        ("Média - Temperatura", @<RadzenText>@($"{valorMedia.temperatura:F2} °C")</RadzenText>, "device_thermostat", null),
+    ("Média - Umidade", @<RadzenText>@($"{valorMedia.umidade:F2} %")</RadzenText>, "water_drop", null),
+    ("Média - PPM", @<RadzenText>@($"{valorMedia.ppm_MQ2:F2}")</RadzenText>, "labs", "Média de concentração de gases."),
+    ("Média - Chama", CheckIcon(valorMedia.chamaDetectada), "local_fire_department", "Detecção de chama média."),
+        ("Média - Monóxido de carbono", CheckIcon(valorMedia.coDetectado), "warning", "Detecção média de monóxido de carbono.")
+    }
+;
+}
+void ShowTooltip(ElementReference elementReference, string? text, TooltipOptions? options = null)
+{
+    if (options is null)
+    {
+        options = new TooltipOptions()
+        {
+            Position = TooltipPosition.Top,
         };
     }
-    void ShowTooltip(ElementReference elementReference, string? text, TooltipOptions? options = null)
+    if (!string.IsNullOrEmpty(text)) tooltipService.Open(elementReference, text, options);
+}
+private static Valores CriarValorAtualVazio()
+{
+    return new Valores()
     {
-        if (options is null)
-        {
-            options = new TooltipOptions()
-                {
-                    Position = TooltipPosition.Top,
-                };
-        }
-        if (!string.IsNullOrEmpty(text)) tooltipService.Open(elementReference, text, options);
-    }
-    private static Valores CriarValorAtualVazio()
+        chamaDetectada = false,
+        coDetectado = false,
+        ppm_MQ2 = 0,
+        temperatura = 0,
+        umidade = 0,
+        valorAnalogico_MQ2 = 0
+    };
+}
+private void VerificarRiscoPerigo(Valores valores)
+{
+    // Referência: https://pubs.aip.org/aip/acp/article-abstract/2431/1/090004/2906139/Home-fire-early-warning-system-using-flame-smoke
+    NotificationSeverity riscoPerigo = NotificationSeverity.Info;
+    bool temPerigo = false;
+
+    if (valores.chamaDetectada && MostrarExtra)
     {
-        return new Valores()
-            {
-                chamaDetectada = false,
-                coDetectado = false,
-                ppm_MQ2 = 0,
-                temperatura = 0,
-                umidade = 0,
-                valorAnalogico_MQ2 = 0
-            };
+        temPerigo = true;
+        riscoPerigo = NotificationSeverity.Error;
+
+        if (!Alerts.Any(a => a.level == AlertLevel.Fire))
+            Alerts.Add(new Alerta(Variant.Filled, AlertStyle.Danger, AlertSize.Large, Shade.Default, "dangerous", "Fogo detectado.", AlertLevel.Fire));
     }
-    private void VerificarRiscoPerigo(Valores valores)
+    if (valores.coDetectado && MostrarExtra)
     {
-        // Referência: https://pubs.aip.org/aip/acp/article-abstract/2431/1/090004/2906139/Home-fire-early-warning-system-using-flame-smoke
-        NotificationSeverity riscoPerigo = NotificationSeverity.Info;
-        bool temPerigo = false;
+        temPerigo = true;
+        riscoPerigo = NotificationSeverity.Error;
 
-        Alerts.Clear();
-
-        if (valores.chamaDetectada && MostrarExtra)
-        {
-            temPerigo = true;
-            riscoPerigo = NotificationSeverity.Error;
-            Alerts.Add(new Alerta(Variant.Filled, AlertStyle.Danger, AlertSize.Large, Shade.Default, "dangerous", "Fogo detectado."));
-        }
-        if (valores.coDetectado && MostrarExtra)
-        {
-            temPerigo = true;
-            riscoPerigo = NotificationSeverity.Error;
-            Alerts.Add(new Alerta(Variant.Filled, AlertStyle.Danger, AlertSize.Large, Shade.Default, "dangerous", "Monóxido de carbono detectado."));
-        }
-        if (valores.temperatura > 45 || valores.ppm_MQ2 > 700 && !valores.chamaDetectada)
-        {
-            temPerigo = true;
-            riscoPerigo = NotificationSeverity.Warning;
-            Alerts.Add(new Alerta(Variant.Filled, AlertStyle.Warning, AlertSize.Large, Shade.Default, "warning", "Ambiente em potencial risco, verifique."));
-        }
-        // danger It is dangerous if the temperature sensor detects a temperature above 45°C or the smoke sensor detects smoke levels above 700 ppm and the flame sensor detect fire.
-        else if (valores.temperatura > 45 || valores.ppm_MQ2 > 700 && valores.chamaDetectada && !MostrarExtra)
-        {
-            temPerigo = true;
-            riscoPerigo = NotificationSeverity.Error;
-            Alerts.Add(new Alerta(Variant.Filled, AlertStyle.Danger, AlertSize.Large, Shade.Default, "dangerous", "Alto risco de incêndio, verifique imediatamente."));
-        }
-
-        if (temPerigo)
-        {
-            NotificationService.Notify(riscoPerigo, "Perigo", "Ambiente fora do normal", closeOnClick: true);
-        }
+        if (!Alerts.Any(a => a.level == AlertLevel.Co))
+            Alerts.Add(new Alerta(Variant.Filled, AlertStyle.Danger, AlertSize.Large, Shade.Default, "dangerous", "Monóxido de carbono detectado.", AlertLevel.Co));
     }
+
+    if (valores.temperatura > dangerParameters.Medio.Temperatura || valores.ppm_MQ2 > dangerParameters.Medio.Ppm && !valores.chamaDetectada)
+    {
+        temPerigo = true;
+        riscoPerigo = NotificationSeverity.Warning;
+
+        if (!Alerts.Any(a => a.level == AlertLevel.Warning))
+            Alerts.Add(new Alerta(Variant.Filled, AlertStyle.Warning, AlertSize.Large, Shade.Default, "warning", "Ambiente em potencial risco, verifique.", AlertLevel.Warning));
+    }
+    // danger It is dangerous if the temperature sensor detects a temperature above 45°C or the smoke sensor detects smoke levels above 700 ppm and the flame sensor detect fire.
+    else if (valores.temperatura > dangerParameters.Alto.Temperatura || valores.ppm_MQ2 > dangerParameters.Alto.Ppm && valores.chamaDetectada && !MostrarExtra)
+    {
+        temPerigo = true;
+        riscoPerigo = NotificationSeverity.Error;
+
+        if (!Alerts.Any(a => a.level == AlertLevel.Danger))
+            Alerts.Add(new Alerta(Variant.Filled, AlertStyle.Danger, AlertSize.Large, Shade.Default, "dangerous", "Alto risco de incêndio, verifique imediatamente.", AlertLevel.Danger));
+    }
+
+    if (temPerigo)
+    {
+        NotificationService.Notify(riscoPerigo, "Perigo", "Ambiente fora do normal", closeOnClick: true);
+    }
+}
+private void VerificarRiscoPerigoMedia()
+{
+    if (Math.Round(valorAtual.temperatura, 2) != Math.Round(valorMedia.temperatura, 2))
+    {
+        Alerts.Add(new Alerta(Variant.Filled, AlertStyle.Warning, AlertSize.Large, Shade.Default, "warning", "Variação significativa de temperatura detectada.", AlertLevel.Warning));
+    }
+
+    if (Math.Round(valorAtual.umidade, 2) != Math.Round(valorMedia.umidade, 2))
+    {
+        Alerts.Add(new Alerta(Variant.Filled, AlertStyle.Warning, AlertSize.Large, Shade.Default, "warning", "Variação significativa de umidade detectada.", AlertLevel.Warning));
+    }
+
+    if (Math.Round(valorAtual.ppm_MQ2, 2) != Math.Round(valorMedia.ppm_MQ2, 2))
+    {
+        Alerts.Add(new Alerta(Variant.Filled, AlertStyle.Warning, AlertSize.Large, Shade.Default, "warning", "Variação significativa de concentração de fumaça/gás detectada.", AlertLevel.Warning));
+    }
+
+    if (valorAtual.coDetectado != valorMedia.coDetectado)
+    {
+        Alerts.Add(new Alerta(Variant.Filled, AlertStyle.Warning, AlertSize.Large, Shade.Default, "warning", "Mudança no estado de detecção de monóxido de carbono.", AlertLevel.Warning));
+    }
+
+    if (valorAtual.chamaDetectada != valorMedia.chamaDetectada)
+    {
+        Alerts.Add(new Alerta(Variant.Filled, AlertStyle.Warning, AlertSize.Large, Shade.Default, "warning", "Mudança no estado de detecção de chama/fogo.", AlertLevel.Warning));
+    }
+}
 }

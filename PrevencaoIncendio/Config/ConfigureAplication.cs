@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using PrevencaoIncendio.Caching;
+using PrevencaoIncendio.Config.Danger;
 using PrevencaoIncendio.Config.Ip;
 using PrevencaoIncendio.Data;
 using PrevencaoIncendio.Mqtt;
@@ -16,11 +17,16 @@ public static class ConfigureAplication
     {
         ConfigureMongoDB(services, configuration);
         ConfigureRedis(services);
+        ConfigureDangerParameters(services, configuration);
 
         services.AddTransient<IValoresRepository, ValoresRepository>();
         services.Configure<IpAddress>(configuration.GetSection("IpAddress"));
-        
-        services.AddHostedService<MqttWorker>();
+
+        var isMqttOnline = configuration.GetValue<bool>("ConnectionStrings:IsMqttOnline");
+        if (isMqttOnline)
+        {
+            services.AddHostedService<MqttWorker>();
+        }
     }
     private static void ConfigureRedis(IServiceCollection services)
     {
@@ -79,6 +85,20 @@ public static class ConfigureAplication
         {
             var client = sp.GetRequiredService<IMongoClient>();
             return client.GetDatabase(DbManager.DatabaseName);
+        });
+    }
+
+    private static void ConfigureDangerParameters(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddTransient(options =>
+        {
+            var dangerParameters = configuration.GetSection("DangerParameters").Get<DangerParameters>();
+            if (dangerParameters is null)
+            {
+                throw new InvalidOperationException("DangerParameters não configurado corretamente.");
+            }
+
+            return dangerParameters;
         });
     }
 }

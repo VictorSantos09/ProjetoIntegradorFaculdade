@@ -51,6 +51,66 @@ public class ValoresRepository : Repository, IValoresRepository
 
         return documentos.Select(d => BsonSerializer.Deserialize<Valores>(d)).ToList();
     }
+    public async Task<Valores> GetNextHourAveragesAsync(DateTime inicio, DateTime fim, int horasGrupo = 1)
+    {
+        var pipeline = _collection.Aggregate()
+            .Match(v => v.LeituraEm >= inicio && v.LeituraEm <= fim)
+            .Group(new BsonDocument
+            {
+            {
+                "_id", new BsonDocument
+                {
+                    { "ano", new BsonDocument("$year", "$LeituraEm") },
+                    { "mes", new BsonDocument("$month", "$LeituraEm") },
+                    { "dia", new BsonDocument("$dayOfMonth", "$LeituraEm") },
+                    { "blocoTempo", new BsonDocument(
+                        "$subtract", new BsonArray
+                        {
+                            new BsonDocument("$hour", "$LeituraEm"),
+                            new BsonDocument("$mod", new BsonArray
+                            {
+                                new BsonDocument("$hour", "$LeituraEm"),
+                                horasGrupo
+                            })
+                        })
+                    }
+                }
+            },
+            { "TemperaturaMedia", new BsonDocument("$avg", "$temperatura") },
+            { "UmidadeMedia", new BsonDocument("$avg", "$umidade") },
+            { "FumacaMedia", new BsonDocument("$avg", "$ppm_MQ2") },
+            { "CO2Media", new BsonDocument("$avg", new BsonDocument("$cond", new BsonArray { "$coDetectado", 1, 0 })) },
+            { "ChamaMedia", new BsonDocument("$avg", new BsonDocument("$cond", new BsonArray { "$chamaDetectada", 1, 0 })) },
+            { "LeituraMaisRecente", new BsonDocument("$max", "$LeituraEm") }
+            })
+            .Sort(Builders<BsonDocument>.Sort.Ascending("_id"));
+
+        var documentos = await pipeline.ToListAsync();
+
+        var resultados = documentos.Select(d =>
+        {
+            return new Valores
+            {
+                LeituraEm = d["LeituraMaisRecente"].ToUniversalTime(),
+                temperatura = d.GetValue("TemperaturaMedia", 0).ToDouble(),
+                umidade = d.GetValue("UmidadeMedia", 0).ToDouble(),
+                ppm_MQ2 = d.GetValue("FumacaMedia", 0).ToDouble(),
+                coDetectado = d.GetValue("CO2Media", 0).ToDouble() >= 0.5,
+                chamaDetectada = d.GetValue("ChamaMedia", 0).ToDouble() >= 0.5
+            };
+        });
+
+        return new Valores
+        {
+            temperatura = resultados.Average(v => v.temperatura),
+            umidade = resultados.Average(v => v.umidade),
+            ppm_MQ2 = resultados.Average(v => v.ppm_MQ2),
+            coDetectado = resultados.Average(v => v.coDetectado ? 1 : 0) >= 0.5,
+            chamaDetectada = resultados.Average(v => v.chamaDetectada ? 1 : 0) >= 0.5,
+            LeituraEm = resultados.Max(v => v.LeituraEm)
+        };
+    }
+
     public async Task<Valores> GetById(string id)
     {
         return await _collection.Find(x => x.Id == id).SingleOrDefaultAsync();

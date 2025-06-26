@@ -17,27 +17,26 @@ public class MqttConfig
 
         timer.Elapsed += OnTimedEvent;
 
-        // Configura o timer para ser executado apenas uma vez
-        timer.AutoReset = false;
+        timer.AutoReset = true;
+        timer.Enabled = true;
 
-        // Inicia o timer
         timer.Start();
     }
     private static void OnTimedEvent(object source, System.Timers.ElapsedEventArgs e)
     {
-        //var valores = new Valores
-        //{
-        //    valorAnalogico_MQ2 = 100,
-        //    ppm_MQ2 = 750,
-        //    chamaDetectada = true,
-        //    temperatura = 46.0,
-        //    umidade = 60.0,
-        //    coDetectado = false,
-        //    LeituraEm = DateTime.Now
-        //};
-        //var jsonString = JsonSerializer.Serialize(valores);
+        var valores = new Valores
+        {
+            valorAnalogico_MQ2 = Random.Shared.Next(1023),
+            ppm_MQ2 = Random.Shared.Next(1023),
+            chamaDetectada = true,
+            temperatura = Random.Shared.Next(50),
+            umidade = Random.Shared.Next(100),
+            coDetectado = false,
+            LeituraEm = DateTime.Now
+        };
+        var jsonString = JsonSerializer.Serialize(valores);
 
-        //MqttMensagem.OnMensagemRecebida("sensor/#", jsonString);
+        MqttMensagem.OnMensagemRecebida("sensor/#", jsonString);
     }
     #endregion
     public static async Task Configure(IValoresRepository valoresRepository, IOptions<IpAddress> ipAddress)
