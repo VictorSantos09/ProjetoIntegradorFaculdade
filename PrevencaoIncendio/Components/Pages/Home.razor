@@ -9,11 +9,11 @@
 @inject DangerParameters dangerParameters
 @inject IValoresRepository ValoresRepository
 
-<PageTitle>Inicio</PageTitle>
+<PageTitle>Início - Painel de Monitoramento</PageTitle>
 
 <RadzenStack Gap="20px">
-    <!-- Alerta -->
-    <div style="display: flex; flex-wrap: wrap; gap: 16px;">
+    <!-- Alertas ativos -->
+    <div class="rz-mb-4" style="display: flex; flex-wrap: wrap; gap: 16px;">
         @foreach (var alert in Alerts)
         {
             <div style="flex: 1 1 300px;">
@@ -29,39 +29,34 @@
         }
     </div>
 
-    <!-- ATUAL -->
-    <RadzenCardGroup Responsive="@responsive" class="rz-mt-4 rz-mb-4 rz-gap-4">
+    <!-- Leituras em tempo real -->
+    <RadzenText TextStyle="TextStyle.H5" Class="rz-mb-2">Leituras em tempo real</RadzenText>
+    <RadzenCardGroup Responsive="@responsive" class="rz-gap-4">
         @foreach (var card in MetricCards())
         {
-            <RadzenCard load Variant="@variant" class="rz-shadow-md rz-rounded-xl rz-p-4" id="@card.Label" MouseEnter="@(args => ShowTooltip(args, card.Tooltip))">
-                <RadzenStack Orientation="Orientation.Horizontal"
-                             JustifyContent="JustifyContent.SpaceBetween"
-                             AlignItems="AlignItems.Center">
+            <RadzenCard load Variant="@variant" class="rz-shadow-md rz-rounded-xl rz-p-4 rz-text-white rz-bg-primary" id="@card.Label" MouseEnter="@(args => ShowTooltip(args, card.Tooltip))">
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
                     <RadzenStack>
                         <RadzenText TextStyle="TextStyle.H6">@card.Label</RadzenText>
                         @card.ValueContent
                     </RadzenStack>
-                    <RadzenIcon Icon="@card.Icon" Style="font-size: 2rem; color: var(--rz-primary);" />
+                    <RadzenIcon Icon="@card.Icon" Style="font-size: 2rem;" />
                 </RadzenStack>
             </RadzenCard>
         }
     </RadzenCardGroup>
 
-    <!-- MEDIA -->
-    <RadzenText TextStyle="TextStyle.Subtitle1">Próxima média será consultada @TempoRestanteFormatado.</RadzenText>
-    <RadzenText TextStyle="TextStyle.Subtitle2"> O tempo de busca está configurado para cada @TempoBuscaFormatado.</RadzenText>
-    <RadzenText TextStyle="TextStyle.Subtitle1">Ultima consulta realizada em @_ultimaBuscaMedia.</RadzenText>
-    <RadzenText TextStyle="TextStyle.Subtitle1">Periodo para busca da média de @dangerParameters.DataInicioMedia.GetValueOrDefault(_buscaPadraoInicialMedia) até @dangerParameters.DataFimMedia.GetValueOrDefault(_buscaPadraoFimMedia).</RadzenText>
-    <RadzenCardGroup Responsive="@responsive" class="rz-mt-4 rz-gap-4">
+    <!-- Médias -->
+    <RadzenText TextStyle="TextStyle.H5" Class="rz-mt-4">Médias das leituras</RadzenText>
+    <RadzenText TextStyle="TextStyle.Subtitle1">Próxima consulta: <b>@TempoRestanteFormatado</b></RadzenText>
+    <RadzenText TextStyle="TextStyle.Subtitle2">Frequência de busca: <b>@TempoBuscaFormatado</b></RadzenText>
+    <RadzenText TextStyle="TextStyle.Subtitle2">Período da média: <b>@dangerParameters.DataInicioMedia.GetValueOrDefault(_buscaPadraoInicialMedia).ToString("dd/MM/yyyy HH:mm")</b> a <b>@dangerParameters.DataFimMedia.GetValueOrDefault(_buscaPadraoFimMedia).ToString("dd/MM/yyyy HH:mm")</b></RadzenText>
+
+    <RadzenCardGroup Responsive="@responsive" class="rz-gap-4 rz-mt-2">
         @foreach (var card in MetricCardsMedias())
         {
-            <RadzenCard load Variant="@variant"
-                        Style="background-color: var(--rz-base); color: var(--rz-base-900);"
-                        class="rz-shadow-md rz-rounded-xl rz-p-4" id="@card.Label"
-                        MouseEnter="@(args => ShowTooltip(args, card.Tooltip))">
-                <RadzenStack Orientation="Orientation.Horizontal"
-                             JustifyContent="JustifyContent.SpaceBetween"
-                             AlignItems="AlignItems.Center">
+            <RadzenCard load Variant="@variant" Style="background-color: var(--rz-base); color: var(--rz-base-900);" class="rz-shadow-md rz-rounded-xl rz-p-4" id="@card.Label" MouseEnter="@(args => ShowTooltip(args, card.Tooltip))">
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
                     <RadzenStack>
                         <RadzenText TextStyle="TextStyle.H6">@card.Label</RadzenText>
                         @card.ValueContent
@@ -72,73 +67,52 @@
         }
     </RadzenCardGroup>
 
-    <!-- Botão para limpar -->
-    <RadzenStack JustifyContent="JustifyContent.End" class="rz-my-2">
-        <RadzenButton Text="Limpar"
-                      Icon="clear"
-                      Click="@Limpar"
-                      ButtonStyle="ButtonStyle.Primary"
-                      IsBusy="@limpando" />
+    <!-- Ações e controles -->
+    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" class="rz-my-4">
+        <RadzenButton Text="Limpar leituras" Icon="clear" Click="@Limpar" ButtonStyle="ButtonStyle.Primary" IsBusy="@limpando" class="rz-mr-2" />
+
+        <RadzenLabel Text="Auto limpar a cada" />
+        <RadzenNumeric TValue="int" @bind-Value="@limparApos" Placeholder="Limpar após" ShowUpDown="true" Style="max-width: 100px; margin-left: 10px;" />
     </RadzenStack>
 
-
-    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center">
-        <RadzenLabel Text="Limpar a cada" />
-        <RadzenNumeric TValue="int"
-                       @bind-Value="@limparApos"
-                       Placeholder="Limpar após"
-                       ShowUpDown="true"
-                       Style="max-width: 150px;" />
-    </RadzenStack>
-
-    <!-- SelectBar visível apenas em telas grandes -->
+    <!-- Opções de densidade -->
     <RadzenSelectBar @bind-Value="@density"
                      TextProperty="Text"
                      ValueProperty="Value"
                      Data="@(Enum.GetValues(typeof(Density)).Cast<Density>().Select(t => new { Text = t.ToString(), Value = t }))"
                      Size="ButtonSize.Medium"
-                     Style="max-width: 300px;"
-                     class="rz-display-none rz-display-xl-flex" />
+                     Style="max-width: 300px;" />
 
-    <!-- DropDown visível em telas menores -->
-    <RadzenDropDown @bind-Value="@density"
-                    TextProperty="Text"
-                    ValueProperty="Value"
-                    Data="@(Enum.GetValues(typeof(Density)).Cast<Density>().Select(t => new { Text = t.ToString(), Value = t }))"
-                    Style="max-width: 300px;"
-                    class="rz-display-inline-flex rz-display-xl-none" />
-    <!-- Grid -->
-    <RadzenDataGrid Data="@Leituras"
-                    TItem="Valores"
-                    Density="@density"
+    <!-- Grid de leituras -->
+    <RadzenDataGrid Data="@Leituras" TItem="Valores" Density="@density"
                     AllowPaging="true"
-                    AllowColumnReorder="true"
-                    AllowColumnResize="true"
                     AllowSorting="true"
+                    AllowColumnResize="true"
+                    ShowPagingSummary="true"
                     AllowMultiColumnSorting="true"
                     ShowMultiColumnSortingIndex="true"
-                    EmptyText="Nenhuma leitura realizada"
-                    ShowPagingSummary="true">
+                    EmptyText="Nenhuma leitura registrada ainda">
         <Columns>
-            <RadzenDataGridColumn Property="@nameof(Valores.LeituraEm)" Title="Leitura em" TextAlign="TextAlign.Center" SortOrder="SortOrder.Descending" OrderIndex="1" />
-            <RadzenDataGridColumn Property="@nameof(Valores.temperatura)" Title="Temperatura" TextAlign="TextAlign.Center" />
+            <RadzenDataGridColumn Property="@nameof(Valores.LeituraEm)" Title="Data e hora" TextAlign="TextAlign.Center" FormatString="{0:dd/MM/yyyy HH:mm}" SortOrder="SortOrder.Descending" OrderIndex="1" />
+            <RadzenDataGridColumn Property="@nameof(Valores.temperatura)" Title="Temperatura (°C)" TextAlign="TextAlign.Center" />
             <RadzenDataGridColumn Property="@nameof(Valores.umidade)" Title="Umidade" TextAlign="TextAlign.Center" />
             <RadzenDataGridColumn Property="@nameof(Valores.ppm_MQ2)" Title="PPM" TextAlign="TextAlign.Center" />
-            <RadzenDataGridColumn Property="@nameof(Valores.chamaDetectada)" Title="Chama / Fogo detectado" TextAlign="TextAlign.Center">
+            <RadzenDataGridColumn Title="Fogo" TextAlign="TextAlign.Center">
                 <Template Context="valor">
                     <RadzenIcon Icon="@(valor.chamaDetectada ? "check_circle" : "cancel")"
                                 Style="@(valor.chamaDetectada ? "color:green;" : "color:red;")" />
                 </Template>
             </RadzenDataGridColumn>
-            <RadzenDataGridColumn Property="@nameof(Valores.coDetectado)" Title="Monóxido de carbono detectado" TextAlign="TextAlign.Center">
+            <RadzenDataGridColumn Title="Co Detectado" TextAlign="TextAlign.Center">
                 <Template Context="valor">
                     <RadzenIcon Icon="@(valor.coDetectado ? "check_circle" : "cancel")"
-                                Style="@(valor.coDetectado ? "color:green;" : "color:red;")" />
+                                Style="@(valor.chamaDetectada ? "color:green;" : "color:red;")" />
                 </Template>
             </RadzenDataGridColumn>
         </Columns>
     </RadzenDataGrid>
 </RadzenStack>
+
 
 @code {
     private const string IconeUmidade = "water_drop";
