@@ -111,6 +111,81 @@ public class ValoresRepository : Repository, IValoresRepository
         };
     }
 
+    public async Task<Valores> GetNextMediansAsync(DateTime inicio, DateTime fim, int horasGrupo = 1)
+    {
+        var pipeline = _collection.Aggregate()
+            .Match(v => v.LeituraEm >= inicio && v.LeituraEm <= fim)
+            .Group(new BsonDocument
+            {
+            {
+                "_id", new BsonDocument
+                {
+                    { "ano", new BsonDocument("$year", "$LeituraEm") },
+                    { "mes", new BsonDocument("$month", "$LeituraEm") },
+                    { "dia", new BsonDocument("$dayOfMonth", "$LeituraEm") },
+                    { "blocoTempo", new BsonDocument(
+                        "$subtract", new BsonArray
+                        {
+                            new BsonDocument("$hour", "$LeituraEm"),
+                            new BsonDocument("$mod", new BsonArray
+                            {
+                                new BsonDocument("$hour", "$LeituraEm"),
+                                horasGrupo
+                            })
+                        })
+                    }
+                }
+            },
+            { "temperaturas", new BsonDocument("$push", "$temperatura") },
+            { "umidades", new BsonDocument("$push", "$umidade") },
+            { "fumacas", new BsonDocument("$push", "$ppm_MQ2") },
+            { "coDetectados", new BsonDocument("$push", "$coDetectado") },
+            { "chamasDetectadas", new BsonDocument("$push", "$chamaDetectada") },
+            { "LeituraMaisRecente", new BsonDocument("$max", "$LeituraEm") }
+            })
+            .Sort(Builders<BsonDocument>.Sort.Ascending("_id"));
+
+        var documentos = await pipeline.ToListAsync();
+
+        var resultados = documentos.Select(d => new Valores
+        {
+            LeituraEm = d["LeituraMaisRecente"].ToUniversalTime(),
+            temperatura = (float)Mediana(d["temperaturas"].AsBsonArray.Select(v => v.ToDouble()).ToList()),
+            umidade = Mediana(d["umidades"].AsBsonArray.Select(v => v.ToDouble()).ToList()),
+            ppm_MQ2 = Mediana(d["fumacas"].AsBsonArray.Select(v => v.ToDouble()).ToList()),
+            coDetectado = Mediana(d["coDetectados"].AsBsonArray.Select(v => v.ToBoolean() ? 1.0 : 0.0).ToList()) >= 0.5,
+            chamaDetectada = Mediana(d["chamasDetectadas"].AsBsonArray.Select(v => v.ToBoolean() ? 1.0 : 0.0).ToList()) >= 0.5
+        });
+
+        // Resultado geral: agregação final com mediana entre os blocos
+        var lista = resultados.ToList();
+        return new Valores
+        {
+            LeituraEm = lista.Max(v => v.LeituraEm),
+            temperatura = (float)Mediana(lista.Select(v => (double)v.temperatura).ToList()),
+            umidade = (float)Mediana(lista.Select(v => (double)v.umidade).ToList()),
+            ppm_MQ2 = (float)Mediana(lista.Select(v => (double)v.ppm_MQ2).ToList()),
+            coDetectado = Mediana(lista.Select(v => v.coDetectado ? 1.0 : 0.0).ToList()) >= 0.5,
+            chamaDetectada = Mediana(lista.Select(v => v.chamaDetectada ? 1.0 : 0.0).ToList()) >= 0.5
+        };
+
+    }
+
+    private static double Mediana(List<double> valores)
+    {
+        if (valores == null || valores.Count == 0)
+            return 0;
+
+        var ordenados = valores.OrderBy(x => x).ToList();
+        int meio = ordenados.Count / 2;
+
+        if (ordenados.Count % 2 == 0)
+            return (ordenados[meio - 1] + ordenados[meio]) / 2.0;
+
+        return ordenados[meio];
+    }
+
+
     public async Task<Valores> GetById(string id)
     {
         return await _collection.Find(x => x.Id == id).SingleOrDefaultAsync();

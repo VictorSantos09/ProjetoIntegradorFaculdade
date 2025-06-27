@@ -47,12 +47,14 @@
         }
     </RadzenCardGroup>
 
-    <!-- Médias -->
-    <RadzenText TextStyle="TextStyle.H5" Class="rz-mt-4">Médias das leituras</RadzenText>
+    <!-- Medianas -->
+    <RadzenText TextStyle="TextStyle.H5" Class="rz-mt-4">Mediana das leituras</RadzenText>
     <RadzenText TextStyle="TextStyle.Subtitle1">Próxima consulta: <b>@TempoRestanteFormatado</b></RadzenText>
     <RadzenText TextStyle="TextStyle.Subtitle2">Frequência de busca: <b>@TempoBuscaFormatado</b></RadzenText>
     <RadzenText TextStyle="TextStyle.Subtitle2">Período da média: <b>@dangerParameters.DataInicioMedia.GetValueOrDefault(_buscaPadraoInicialMedia).ToString("dd/MM/yyyy HH:mm")</b> a <b>@dangerParameters.DataFimMedia.GetValueOrDefault(_buscaPadraoFimMedia).ToString("dd/MM/yyyy HH:mm")</b></RadzenText>
-
+    <RadzenText TextStyle="TextStyle.Subtitle2" Class="rz-mt-1">
+        <i>As medianas são utilizadas por serem menos sensíveis a valores extremos ou leituras atípicas dos sensores, tornando a análise mais robusta e confiável.</i>
+    </RadzenText>
     <RadzenCardGroup Responsive="@responsive" class="rz-gap-4 rz-mt-2">
         @foreach (var card in MetricCardsMedias())
         {
@@ -275,7 +277,7 @@
     {
         try
         {
-            var valor = await ValoresRepository.GetNextAveragesAsync(dangerParameters.DataInicioMedia.GetValueOrDefault(_buscaPadraoInicialMedia), dangerParameters.DataFimMedia.GetValueOrDefault(_buscaPadraoFimMedia));
+            var valor = await ValoresRepository.GetNextMediansAsync(dangerParameters.DataInicioMedia.GetValueOrDefault(_buscaPadraoInicialMedia), dangerParameters.DataFimMedia.GetValueOrDefault(_buscaPadraoFimMedia));
             if (valor is not null)
             {
                 valorMedia = valor;
@@ -336,11 +338,11 @@ private IEnumerable<(string Label, RenderFragment ValueContent, string Icon, str
 
     return new[]
     {
-        ("Média - Temperatura", @<RadzenText>@($"{valorMedia.temperatura:F2} °C")</RadzenText>, IconeTemperatura, null),
-        ("Média - Umidade", @<RadzenText>@($"{valorMedia.umidade:F2} %")</RadzenText>, IconeUmidade, null),
-        ("Média - PPM", @<RadzenText>@($"{valorMedia.ppm_MQ2:F2}")</RadzenText>, IconePPM, "Média de concentração de gases."),
-        ("Média - Chama", CheckIcon(valorMedia.chamaDetectada), IconeFogo, "Detecção de chama média."),
-        ("Média - Monóxido de carbono", CheckIcon(valorMedia.coDetectado), IconeCo, "Detecção média de monóxido de carbono.")
+        ("Temperatura", @<RadzenText>@($"{valorMedia.temperatura:F2} °C")</RadzenText>, IconeTemperatura, null),
+        ("Umidade", @<RadzenText>@($"{valorMedia.umidade:F2} %")</RadzenText>, IconeUmidade, null),
+        ("PPM", @<RadzenText>@($"{valorMedia.ppm_MQ2:F2}")</RadzenText>, IconePPM, "Média de concentração de gases."),
+        ("Chama", CheckIcon(valorMedia.chamaDetectada), IconeFogo, "Detecção de chama média."),
+        ("Monóxido de carbono", CheckIcon(valorMedia.coDetectado), IconeCo, "Detecção média de monóxido de carbono.")
     };
     }
     void ShowTooltip(ElementReference elementReference, string? text, TooltipOptions? options = null)
