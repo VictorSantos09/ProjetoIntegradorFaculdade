@@ -25,7 +25,7 @@
                              AllowClose="true"
                              Text="@alert.DataCriacao.ToString("dd/MM/yyyy HH:mm")"
                              Title="@alert.Message"
-                             Close="@(() => RemoverAlerta(alert))"/>
+                             Close="@(() => RemoverAlerta(alert))" />
             </div>
         }
     </div>
@@ -145,7 +145,6 @@
     private DateTime _proximaBuscaMedia;
     private DateTime _buscaPadraoInicialMedia = DateTime.Now.AddDays(-1);
     private DateTime _buscaPadraoFimMedia = DateTime.Now;
-
     private string TempoRestanteFormatado
     {
         get
@@ -193,31 +192,32 @@
                 : "menos de 1 segundo";
         }
     }
-
-
-
-    protected override void OnInitialized()
-    {
-        MqttMensagem.MensagemRecebida += OnMqttMensagemRecebida;
-    }
+    private PeriodicTimer? _periodicTimer;
+    private CancellationTokenSource? _cancellationTokenSource;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            _timer = new Timer(dangerParameters.TempoBuscaMediaMs);
-            _timer.AutoReset = true;
-            _timer.Enabled = true;
-            _timer.Elapsed += async (sender, args) =>
+            _cancellationTokenSource = new CancellationTokenSource();
+            _periodicTimer = new PeriodicTimer(TimeSpan.FromMilliseconds(dangerParameters.TempoBuscaMediaMs));
+
+            _ = Task.Run(async () =>
             {
-                await BuscarMediaValoresAsync();
-                await InvokeAsync(StateHasChanged);
-            };
+                while (await _periodicTimer.WaitForNextTickAsync(_cancellationTokenSource.Token))
+                {
+                    await BuscarMediaValoresAsync();
+                    await InvokeAsync(StateHasChanged);
+                }
+            });
+
             await BuscarMediaValoresAsync();
+
+            MqttMensagem.MensagemRecebida -= OnMqttMensagemRecebida;
+            MqttMensagem.MensagemRecebida += OnMqttMensagemRecebida;
             StateHasChanged();
         }
     }
-
 
     private async void OnMqttMensagemRecebida(object? sender, MensagemRecebidaEventArgs args)
     {
@@ -339,11 +339,12 @@ private IEnumerable<(string Label, RenderFragment ValueContent, string Icon, str
     return new[]
     {
         ("Temperatura", @<RadzenText>@($"{valorMedia.temperatura:F2} °C")</RadzenText>, IconeTemperatura, null),
-        ("Umidade", @<RadzenText>@($"{valorMedia.umidade:F2} %")</RadzenText>, IconeUmidade, null),
-        ("PPM", @<RadzenText>@($"{valorMedia.ppm_MQ2:F2}")</RadzenText>, IconePPM, "Média de concentração de gases."),
-        ("Chama", CheckIcon(valorMedia.chamaDetectada), IconeFogo, "Detecção de chama média."),
+    ("Umidade", @<RadzenText>@($"{valorMedia.umidade:F2} %")</RadzenText>, IconeUmidade, null),
+    ("PPM", @<RadzenText>@($"{valorMedia.ppm_MQ2:F2}")</RadzenText>, IconePPM, "Média de concentração de gases."),
+    ("Chama", CheckIcon(valorMedia.chamaDetectada), IconeFogo, "Detecção de chama média."),
         ("Monóxido de carbono", CheckIcon(valorMedia.coDetectado), IconeCo, "Detecção média de monóxido de carbono.")
-    };
+    }
+;
     }
     void ShowTooltip(ElementReference elementReference, string? text, TooltipOptions? options = null)
 {
@@ -451,7 +452,6 @@ private void VerificarRiscoPerigoMedia()
             AlertLevel.MediaFire));
     }
 }
-
 
 private void VerificarVariacaoRelativa(
     string nomeCampo,
