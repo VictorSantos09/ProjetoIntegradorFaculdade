@@ -51,7 +51,7 @@ public class ValoresRepository : Repository, IValoresRepository
 
         return documentos.Select(d => BsonSerializer.Deserialize<Valores>(d)).ToList();
     }
-    public async Task<Valores> GetNextHourAveragesAsync(DateTime inicio, DateTime fim, int horasGrupo = 1)
+    public async Task<Valores> GetNextAveragesAsync(DateTime inicio, DateTime fim, int horasGrupo = 1)
     {
         var pipeline = _collection.Aggregate()
             .Match(v => v.LeituraEm >= inicio && v.LeituraEm <= fim)

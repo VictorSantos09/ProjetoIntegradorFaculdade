@@ -16,15 +16,16 @@
     <div class="rz-mb-4" style="display: flex; flex-wrap: wrap; gap: 16px;">
         @foreach (var alert in Alerts)
         {
-            <div style="flex: 1 1 300px;">
+            <div style="flex: 1 1 300px;" @key="alert.level">
                 <RadzenAlert Variant="@alert.Variant"
                              AlertStyle="@alert.Style"
                              Size="@alert.Size"
                              Shade="@alert.Shade"
                              Icon="@alert.icon"
-                             AllowClose="true">
-                    @alert.message
-                </RadzenAlert>
+                             AllowClose="true"
+                             Text="@DateTime.Now.ToString("dd/MM/yyyy HH:mm")"
+                             Title="@alert.message"
+                             Close="@(() => RemoverAlerta(alert))"/>
             </div>
         }
     </div>
@@ -243,11 +244,25 @@
         }
     }
 
+    private void RemoverAlerta(Alerta alerta)
+    {
+        var alertaExistente = Alerts.FirstOrDefault(a => a.level == alerta.level && a.message == alerta.message);
+        if (alertaExistente is not null)
+        {
+            Alerts.Remove(alertaExistente);
+            StateHasChanged();
+        }
+        else
+        {
+            NotificationService.Notify(summary: "Erro", detail: "Não foi possível deletar o alerta.");
+        }
+    }
+
     private async Task BuscarMediaValoresAsync()
     {
         try
         {
-            var valor = await ValoresRepository.GetNextHourAveragesAsync(dangerParameters.DataInicioMedia.GetValueOrDefault(_buscaPadraoInicialMedia), dangerParameters.DataFimMedia.GetValueOrDefault(_buscaPadraoFimMedia));
+            var valor = await ValoresRepository.GetNextAveragesAsync(dangerParameters.DataInicioMedia.GetValueOrDefault(_buscaPadraoInicialMedia), dangerParameters.DataFimMedia.GetValueOrDefault(_buscaPadraoFimMedia));
             if (valor is not null)
             {
                 valorMedia = valor;
@@ -309,12 +324,11 @@ private IEnumerable<(string Label, RenderFragment ValueContent, string Icon, str
     return new[]
     {
         ("Média - Temperatura", @<RadzenText>@($"{valorMedia.temperatura:F2} °C")</RadzenText>, IconeTemperatura, null),
-    ("Média - Umidade", @<RadzenText>@($"{valorMedia.umidade:F2} %")</RadzenText>, IconeUmidade, null),
-    ("Média - PPM", @<RadzenText>@($"{valorMedia.ppm_MQ2:F2}")</RadzenText>, IconePPM, "Média de concentração de gases."),
-    ("Média - Chama", CheckIcon(valorMedia.chamaDetectada), IconeFogo, "Detecção de chama média."),
+        ("Média - Umidade", @<RadzenText>@($"{valorMedia.umidade:F2} %")</RadzenText>, IconeUmidade, null),
+        ("Média - PPM", @<RadzenText>@($"{valorMedia.ppm_MQ2:F2}")</RadzenText>, IconePPM, "Média de concentração de gases."),
+        ("Média - Chama", CheckIcon(valorMedia.chamaDetectada), IconeFogo, "Detecção de chama média."),
         ("Média - Monóxido de carbono", CheckIcon(valorMedia.coDetectado), IconeCo, "Detecção média de monóxido de carbono.")
-    }
-    ;
+    };
     }
     void ShowTooltip(ElementReference elementReference, string? text, TooltipOptions? options = null)
 {
@@ -379,13 +393,21 @@ private void VerificarRiscoPerigo(Valores valores)
 
     if (temPerigo)
     {
-        NotificationService.Notify(riscoPerigo, "Perigo", "Ambiente fora do normal", closeOnClick: true);
+        NotificationService.Notify(new NotificationMessage
+        {
+            Severity = riscoPerigo,
+            Summary = "Perigo",
+            Detail = "Ambiente fora do normal",
+            Duration = 4000,
+            CloseOnClick = true,
+            Style = "position: fixed; top: 1rem; left: 1rem; z-index: 9999;"
+        });
+
     }
 }
 private void VerificarRiscoPerigoMedia()
 {
-    const double margemPercentual = 0.10; // 10%
-
+    var margemPercentual = dangerParameters.PercentualDiferenca;
     VerificarVariacaoRelativa("Temperatura", valorAtual.temperatura, valorMedia.temperatura, margemPercentual, IconeTemperatura, AlertLevel.MediaTemperatura);
     VerificarVariacaoRelativa("Umidade", valorAtual.umidade, valorMedia.umidade, margemPercentual, IconeUmidade, AlertLevel.MediaUmidade);
     VerificarVariacaoRelativa("Fumaça", valorAtual.ppm_MQ2, valorMedia.ppm_MQ2, margemPercentual, IconePPM, AlertLevel.MediaPpm);
@@ -398,7 +420,7 @@ private void VerificarRiscoPerigoMedia()
             AlertSize.Large,
             Shade.Default,
             IconeCo,
-            "Mudança no estado de detecção de monóxido de carbono.",
+            "Estado de monóxido de carbono diferente da média.",
             AlertLevel.Co));
     }
 
@@ -410,7 +432,7 @@ private void VerificarRiscoPerigoMedia()
             AlertSize.Large,
             Shade.Default,
             IconeFogo,
-            "Mudança no estado de detecção de chama/fogo.",
+            "Estado de chama/fogo diferente da média.",
             AlertLevel.MediaFire));
     }
 }
@@ -436,7 +458,7 @@ private void VerificarVariacaoRelativa(
             AlertSize.Large,
             Shade.Default,
             icone,
-            $"Variação significativa de {nomeCampo.ToLower()} detectada.",
+            $"Estado de {nomeCampo.ToLower()} diferente da média.",
             nivelAlerta));
     }
 }
