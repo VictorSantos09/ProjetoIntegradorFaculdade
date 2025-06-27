@@ -16,15 +16,15 @@
     <div class="rz-mb-4" style="display: flex; flex-wrap: wrap; gap: 16px;">
         @foreach (var alert in Alerts)
         {
-            <div style="flex: 1 1 300px;" @key="alert.level">
+            <div style="flex: 1 1 300px;" @key="alert.Level">
                 <RadzenAlert Variant="@alert.Variant"
                              AlertStyle="@alert.Style"
                              Size="@alert.Size"
                              Shade="@alert.Shade"
-                             Icon="@alert.icon"
+                             Icon="@alert.Icon"
                              AllowClose="true"
-                             Text="@DateTime.Now.ToString("dd/MM/yyyy HH:mm")"
-                             Title="@alert.message"
+                             Text="@alert.DataCriacao.ToString("dd/MM/yyyy HH:mm")"
+                             Title="@alert.Message"
                              Close="@(() => RemoverAlerta(alert))"/>
             </div>
         }
@@ -70,7 +70,13 @@
 
     <!-- Ações e controles -->
     <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" class="rz-my-4">
-        <RadzenButton Text="Limpar leituras" Icon="clear" Click="@Limpar" ButtonStyle="ButtonStyle.Primary" IsBusy="@limpando" class="rz-mr-2" />
+        <RadzenButton Text="Limpar leituras"
+                      Icon="clear"
+                      Click="@Limpar"
+                      ButtonStyle="ButtonStyle.Primary"
+                      IsBusy="@limpando"
+                      Disabled="@limpando"
+                      class="rz-mr-2" />
 
         <RadzenLabel Text="Auto limpar a cada" />
         <RadzenNumeric TValue="int" @bind-Value="@limparApos" Placeholder="Limpar após" ShowUpDown="true" Style="max-width: 100px; margin-left: 10px;" />
@@ -107,7 +113,7 @@
             <RadzenDataGridColumn Title="Co Detectado" TextAlign="TextAlign.Center">
                 <Template Context="valor">
                     <RadzenIcon Icon="@(valor.coDetectado ? "check_circle" : "cancel")"
-                                Style="@(valor.chamaDetectada ? "color:green;" : "color:red;")" />
+                                Style="@(valor.coDetectado ? "color:green;" : "color:red;")" />
                 </Template>
             </RadzenDataGridColumn>
         </Columns>
@@ -191,18 +197,25 @@
     protected override void OnInitialized()
     {
         MqttMensagem.MensagemRecebida += OnMqttMensagemRecebida;
-
-        _timer = new Timer(dangerParameters.TempoBuscaMediaMs);
-        _timer.AutoReset = true;
-        _timer.Enabled = true;
-
-        _timer.Elapsed += async (sender, args) =>
-        {
-            await BuscarMediaValoresAsync();
-            await InvokeAsync(StateHasChanged);
-        };
-        _ = BuscarMediaValoresAsync();
     }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _timer = new Timer(dangerParameters.TempoBuscaMediaMs);
+            _timer.AutoReset = true;
+            _timer.Enabled = true;
+            _timer.Elapsed += async (sender, args) =>
+            {
+                await BuscarMediaValoresAsync();
+                await InvokeAsync(StateHasChanged);
+            };
+            await BuscarMediaValoresAsync();
+            StateHasChanged();
+        }
+    }
+
 
     private async void OnMqttMensagemRecebida(object? sender, MensagemRecebidaEventArgs args)
     {
@@ -246,7 +259,7 @@
 
     private void RemoverAlerta(Alerta alerta)
     {
-        var alertaExistente = Alerts.FirstOrDefault(a => a.level == alerta.level && a.message == alerta.message);
+        var alertaExistente = Alerts.FirstOrDefault(a => a.Level == alerta.Level && a.Message == alerta.Message);
         if (alertaExistente is not null)
         {
             Alerts.Remove(alertaExistente);
@@ -466,6 +479,6 @@ private void VerificarVariacaoRelativa(
 
 private void AddIfNotExists(Alerta alerta)
 {
-    if (!Alerts.Exists(x => x.level == alerta.level)) Alerts.Add(alerta);
+    if (!Alerts.Exists(x => x.Level == alerta.Level)) Alerts.Add(alerta);
 }
 }

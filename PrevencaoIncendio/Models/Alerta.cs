@@ -2,7 +2,10 @@
 
 namespace PrevencaoIncendio.Models;
 
-public record Alerta(Variant Variant, AlertStyle Style, AlertSize Size, Shade Shade, string icon, string message, AlertLevel level);
+public record Alerta(Variant Variant, AlertStyle Style, AlertSize Size, Shade Shade, string Icon, string Message, AlertLevel Level)
+{
+    public DateTime DataCriacao { get; set; } = DateTime.Now;
+}
 public enum AlertLevel
 {
     Fire,
