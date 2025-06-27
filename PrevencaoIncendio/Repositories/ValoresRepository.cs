@@ -6,6 +6,15 @@ using PrevencaoIncendio.Models;
 
 namespace PrevencaoIncendio.Repositories;
 
+public enum IntervaloAgrupamento
+{
+    Ano,
+    Mes,
+    Dia,
+    Hora,
+    Minuto
+}
+
 public class ValoresRepository : Repository, IValoresRepository
 {
     private readonly IMongoCollection<Valores> _collection;
@@ -23,34 +32,84 @@ public class ValoresRepository : Repository, IValoresRepository
     {
         return await _collection.Find(_ => true).ToListAsync();
     }
-    public async Task<IEnumerable<Valores>> GetLastMinutesGroupedAsync(int minutos = 30)
+    public async Task<IEnumerable<Valores>> GetUltimosAgrupadosAsync(
+     DateTime inicio,
+     IntervaloAgrupamento agrupamento,
+     int intervaloMinuto = 60)
     {
-        var dataLimite = DateTime.UtcNow.AddMinutes(-minutos);
+        var matchStage = new BsonDocument("$match", new BsonDocument("LeituraEm", new BsonDocument("$gte", inicio)));
+
+        var addFieldsDoc = new BsonDocument();
+        if (agrupamento >= IntervaloAgrupamento.Hora)
+        {
+            addFieldsDoc.Add("intervaloHora", new BsonDocument("$hour", "$LeituraEm"));
+        }
+        if (agrupamento == IntervaloAgrupamento.Minuto)
+        {
+            addFieldsDoc.Add("intervaloMinuto", new BsonDocument("$subtract", new BsonArray
+        {
+            new BsonDocument("$minute", "$LeituraEm"),
+            new BsonDocument("$mod", new BsonArray {
+                new BsonDocument("$minute", "$LeituraEm"),
+                intervaloMinuto
+            })
+        }));
+        }
+
+        var idDoc = new BsonDocument
+    {
+        { "ano", new BsonDocument("$year", "$LeituraEm") }
+    };
+
+        if (agrupamento >= IntervaloAgrupamento.Mes)
+            idDoc.Add("mes", new BsonDocument("$month", "$LeituraEm"));
+
+        if (agrupamento >= IntervaloAgrupamento.Dia)
+            idDoc.Add("dia", new BsonDocument("$dayOfMonth", "$LeituraEm"));
+
+        if (agrupamento >= IntervaloAgrupamento.Hora)
+            idDoc.Add("hora", "$intervaloHora");
+
+        if (agrupamento == IntervaloAgrupamento.Minuto)
+            idDoc.Add("minuto", "$intervaloMinuto");
+
+        var groupDoc = new BsonDocument
+                            {
+                                { "_id", idDoc },
+                                { "data", new BsonDocument("$max", "$LeituraEm") },
+                                { "temperaturas", new BsonDocument("$push", "$temperatura") },
+                                { "umidades", new BsonDocument("$push", "$umidade") },
+                                { "ppms", new BsonDocument("$push", "$ppm_MQ2") },
+                                { "detectadoFogo", new BsonDocument("$max", new BsonDocument("$cond", new BsonArray { "$chamaDetectada", 1, 0 })) },
+                                { "detectadoCO", new BsonDocument("$max", new BsonDocument("$cond", new BsonArray { "$coDetectado", 1, 0 })) }
+                            };
 
         var pipeline = _collection.Aggregate()
-            .Match(v => v.LeituraEm >= dataLimite)
-            .Group(new BsonDocument
-            {
+       .As<BsonDocument>()
+       .AppendStage<BsonDocument>(matchStage);
+
+        if (addFieldsDoc.ElementCount > 0)
         {
-            "_id", new BsonDocument
-            {
-                { "ano", new BsonDocument("$year", "$LeituraEm") },
-                { "mes", new BsonDocument("$month", "$LeituraEm") },
-                { "dia", new BsonDocument("$dayOfMonth", "$LeituraEm") },
-                { "hora", new BsonDocument("$hour", "$LeituraEm") },
-                { "minuto", new BsonDocument("$minute", "$LeituraEm") }
-            }
-        },
-        { "maisRecente", new BsonDocument("$max", "$LeituraEm") },
-        { "doc", new BsonDocument("$first", "$$ROOT") }
-            })
-            .ReplaceRoot<BsonDocument>("$doc") // se quiser resultado tipado, será convertido abaixo
-            .Sort(Builders<BsonDocument>.Sort.Ascending("LeituraEm"));
+            pipeline = pipeline.AppendStage<BsonDocument>(new BsonDocument("$addFields", addFieldsDoc));
+        }
+
+        pipeline = pipeline
+            .AppendStage<BsonDocument>(new BsonDocument("$group", groupDoc))
+            .AppendStage<BsonDocument>(new BsonDocument("$sort", new BsonDocument("data", 1)));
 
         var documentos = await pipeline.ToListAsync();
 
-        return documentos.Select(d => BsonSerializer.Deserialize<Valores>(d)).ToList();
+        return documentos.Select(d => new Valores
+        {
+            LeituraEm = d["data"].ToUniversalTime(),
+            temperatura = (float)Mediana(d["temperaturas"].AsBsonArray.Select(x => x.ToDouble()).ToList()),
+            umidade = Mediana(d["umidades"].AsBsonArray.Select(x => x.ToDouble()).ToList()),
+            ppm_MQ2 = Mediana(d["ppms"].AsBsonArray.Select(x => x.ToDouble()).ToList()),
+            chamaDetectada = d.GetValue("detectadoFogo", 0).ToInt32() == 1,
+            coDetectado = d.GetValue("detectadoCO", 0).ToInt32() == 1
+        });
     }
+
     public async Task<Valores> GetNextAveragesAsync(DateTime inicio, DateTime fim, int horasGrupo = 1)
     {
         var pipeline = _collection.Aggregate()
@@ -184,7 +243,6 @@ public class ValoresRepository : Repository, IValoresRepository
 
         return ordenados[meio];
     }
-
 
     public async Task<Valores> GetById(string id)
     {

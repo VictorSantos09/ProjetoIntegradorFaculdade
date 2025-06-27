@@ -1,19 +1,21 @@
 ﻿@using PrevencaoIncendio.Caching
+@using PrevencaoIncendio.Config.Graphic
 @using Radzen
 @using Radzen.Blazor
 
 @inject IDatabase Cache
 @inject IValoresRepository ValoresRepository
+@inject GraphicParameters GraphicParameters
 
 <RadzenStack Orientation="Orientation.Vertical" Gap="2rem" class="rz-p-8 rz-p-md-6 rz-p-lg-12">
 
     <RadzenCard Variant="Variant.Outlined" Class="rz-p-4 rz-mb-4">
         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap" Gap="1rem">
             <RadzenCheckBox @bind-Value="@showDataLabels" Name="dataLabels" />
-            <RadzenLabel Text="Show Data Labels" Component="dataLabels" />
+            <RadzenLabel Text="Mostrar rótulos nos pontos" Component="dataLabels" />
 
             <RadzenCheckBox @bind-Value="@showMarkers" Name="markers" />
-            <RadzenLabel Text="Show Markers" Component="markers" />
+            <RadzenLabel Text="Mostrar marcadores" Component="markers" />
         </RadzenStack>
     </RadzenCard>
 
@@ -121,8 +123,8 @@
             }
             else
             {
-                valores = await ValoresRepository.GetLastMinutesGroupedAsync(600000);
-                await Cache.SetRecordAsync(CacheKeys.VALOR_SENSORES, valores);
+                valores = await ValoresRepository.GetUltimosAgrupadosAsync(GraphicParameters.Inicio, GraphicParameters.Agrupamento, GraphicParameters.IntervaloMinuto.GetValueOrDefault());
+                 await Cache.SetRecordAsync(CacheKeys.VALOR_SENSORES, valores);
             }
         }
         else
@@ -130,9 +132,9 @@
             valores = Data;
         }
 
-        ProcessedData = valores.Select(d => new SensorData
+        ProcessedData = valores.OrderBy(x => x.LeituraEm).Select(d => new SensorData
             {
-                Hora = d.LeituraEm.ToLocalTime().ToString("HH:mm"),
+                Hora = d.LeituraEm.ToLocalTime().ToString("dd/MM/yy"),
                 Temperatura = Math.Round(d.temperatura, 2),
                 Umidade = Math.Round(d.umidade, 2),
                 PPM = Math.Round(d.ppm_MQ2, 2),

@@ -2,6 +2,7 @@
 using MongoDB.Driver;
 using PrevencaoIncendio.Caching;
 using PrevencaoIncendio.Config.Danger;
+using PrevencaoIncendio.Config.Graphic;
 using PrevencaoIncendio.Config.Ip;
 using PrevencaoIncendio.Data;
 using PrevencaoIncendio.Mqtt;
@@ -18,6 +19,7 @@ public static class ConfigureAplication
         ConfigureMongoDB(services, configuration);
         ConfigureRedis(services);
         ConfigureDangerParameters(services, configuration);
+        ConfigureGraphics(services, configuration);
 
         services.AddTransient<IValoresRepository, ValoresRepository>();
         services.Configure<IpAddress>(configuration.GetSection("IpAddress"));
@@ -98,6 +100,19 @@ public static class ConfigureAplication
             return dangerParameters is null
                 ? throw new InvalidOperationException("DangerParameters não configurado corretamente.")
                 : dangerParameters;
+        });
+    }
+
+    private static void ConfigureGraphics(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddTransient(options =>
+        {
+            var parameters = configuration.GetSection("Graphic").Get<GraphicParameters>();
+            parameters?.VerificarParametros();
+
+            return parameters is null
+                ? throw new InvalidOperationException("DangerParameters não configurado corretamente.")
+                : parameters;
         });
     }
 }
