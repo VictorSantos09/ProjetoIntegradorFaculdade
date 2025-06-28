@@ -29,6 +29,10 @@ public static class ConfigureAplication
         {
             services.AddHostedService<MqttWorker>();
         }
+        else
+        {
+            MqttConfig.ConfigureFaker();
+        }
     }
     private static void ConfigureRedis(IServiceCollection services)
     {
