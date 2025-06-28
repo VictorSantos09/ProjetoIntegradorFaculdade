@@ -52,7 +52,7 @@
     <RadzenText TextStyle="TextStyle.Subtitle1">Próxima consulta: <b>@TempoRestanteFormatado</b></RadzenText>
     <RadzenText TextStyle="TextStyle.Subtitle2">Frequência de busca: <b>@TempoBuscaFormatado</b></RadzenText>
     <RadzenText TextStyle="TextStyle.Subtitle2">Período da média: <b>@dangerParameters.DataInicioMedia.GetValueOrDefault(_buscaPadraoInicialMedia).ToString("dd/MM/yyyy HH:mm")</b> a <b>@dangerParameters.DataFimMedia.GetValueOrDefault(_buscaPadraoFimMedia).ToString("dd/MM/yyyy HH:mm")</b></RadzenText>
-    <RadzenText TextStyle="TextStyle.Subtitle2"><b>Percentual de diferença: @dangerParameters.PercentualDiferenca%</b></RadzenText>
+    <RadzenText TextStyle="TextStyle.Subtitle2"><b>Percentual de diferença: @(dangerParameters.PercentualDiferenca * 100)%</b></RadzenText>
     <RadzenText TextStyle="TextStyle.Subtitle2" Class="rz-mt-1">
         <i>As medianas são utilizadas por serem menos sensíveis a valores extremos ou leituras atípicas dos sensores, tornando a análise mais robusta e confiável.</i>
     </RadzenText>
@@ -139,7 +139,7 @@
     private Timer _timer;
     private DateTime _ultimaBuscaMedia;
     private DateTime _proximaBuscaMedia;
-    private DateTime _buscaPadraoInicialMedia = DateTime.Now.AddDays(-1);
+    private DateTime _buscaPadraoInicialMedia = DateTime.Now.AddDays(-7);
     private DateTime _buscaPadraoFimMedia = DateTime.Now;
     private string TempoRestanteFormatado
     {
@@ -337,9 +337,9 @@ private IEnumerable<(string Label, RenderFragment ValueContent, string Icon, str
     {
         ("Temperatura", @<RadzenText>@($"{valorMedia.temperatura:F2} °C")</RadzenText>, IconeTemperatura, null),
     ("Umidade", @<RadzenText>@($"{valorMedia.umidade:F2} %")</RadzenText>, IconeUmidade, null),
-    ("PPM", @<RadzenText>@($"{valorMedia.ppm_MQ2:F2}")</RadzenText>, IconePPM, "Média de concentração de gases."),
+    ("PPM Fumaça", @<RadzenText>@($"{valorMedia.ppm_MQ2:F2}")</RadzenText>, IconePPM, "Média de concentração de gases."),
     ("PPM Co", @<RadzenText>@($"{valorMedia.ppm_CO_MQ7:F2}")</RadzenText>, IconeCo, "Média de monóxido de carbono."),
-("Chama", CheckIcon(valorMedia.chamaDetectada), IconeFogo, "Detecção de chama média."),
+("Chama / Fogo", CheckIcon(valorMedia.chamaDetectada), IconeFogo, "Detecção de chama média."),
     }
 ;
     }
@@ -379,7 +379,7 @@ private void VerificarRiscoPerigo(Valores valores)
 
         AddIfNotExists(new Alerta(Variant.Filled, AlertStyle.Danger, AlertSize.Large, Shade.Default, IconeFogo, "Fogo detectado.", AlertLevel.Fire));
     }
-    if (valores.CoNaoSeguro)
+    if (valores.ppm_CO_MQ7 >= dangerParameters.Co)
     {
         temPerigo = true;
         riscoPerigo = NotificationSeverity.Error;
