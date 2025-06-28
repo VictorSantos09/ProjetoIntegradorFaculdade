@@ -4,205 +4,173 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 
-
-// === Sensores e pinos ===
-#define PINO_DHT 33  // DHT11 no GPIO33
-#define TIPO_DHT DHT11
-DHT dht(PINO_DHT, TIPO_DHT);
-
-const int PINO_LED_PLACA = 2;          // LED embutido no ESP32 (opcional)
-const int PINO_SENSOR_MQ7 = 35;        // exemplo GPIO
-const int PINO_SENSOR_CHAMA = 4;       // KY-026 no GPIO4
-const int PINO_SENSOR_MQ2 = 32;        // MQ-2 no GPIO32 (analógico)
-
-// Intervalo de leitura
-const int INTERVALO_LEITURA_MS = 1000;
-
-// Credenciais Wi-Fi
-const char* ssid = "SENAC";
-const char* senha = "x1y2z3@snc";
-
-// Servidor MQTT
-const char* endereco_mqtt = "10.10.29.69";
-const int porta_mqtt = 1883;
+// === Configurações de WiFi e MQTT ===
+const char* ssid       = "SENAC";
+const char* senha      = "x1y2z3@snc";
+const char* mqttServer = "10.10.28.172";
+const int   mqttPort   = 1883;
 
 WiFiClient espClient;
 PubSubClient clienteMQTT(espClient);
 
-// Variáveis do sensor MQ-2
-#define RESISTENCIA_CARGA 10.0  // em kOhm
-#define NUM_AMOSTRAS 10
-int leiturasGas[NUM_AMOSTRAS];
-int indiceGas = 0;
-int totalGas = 0;
-float Ro = 10.0; // valor inicial arbitrário
+// === Sensores e pinos ===
+#define PINO_DHT       33    // DHT11 no GPIO33
+#define TIPO_DHT       DHT11
+DHT dht(PINO_DHT, TIPO_DHT);
 
-// === Funções ===
+const int PINO_LED_PLACA = 2;   // LED interno ESP32
+const int PINO_MQ2       = 32;  // MQ-2 no GPIO32 (analógico)
+const int PINO_MQ7       = 35;  // MQ-7 no GPIO35 (analógico)
+const int PINO_CHAMA     = 4;   // KY-026 no GPIO4
 
-void calibrarSensorMQ2() {
-  Serial.println("⏳ Calibrando sensor MQ-2 em ar limpo...");
-  verificarConexaoMQTT();
+// === Parâmetros do MQ ===
+#define RESISTENCIA_CARGA 10.0  // kΩ (RL = 10 kΩ)
+#define NUM_AMOSTRAS      10    // média móvel
 
-  StaticJsonDocument<200> doc;
-  doc["calibrando"] = true;
-  char bufferJson[256];
-  serializeJson(doc, bufferJson);
-  clienteMQTT.publish("sensor/calibrando", bufferJson);
+float leiturasMQ2[NUM_AMOSTRAS];
+float leiturasMQ7[NUM_AMOSTRAS];
+int   idx2 = 0, idx7 = 0;
+float soma2 = 0, soma7 = 0;
+float Ro2 = 10.0; // Ro calibrado MQ-2 (ar limpo / 9.83)
+float Ro7 = 0.0;  // Ro calibrado MQ-7 (definido abaixo)
 
-  float somaRs = 0;
-  for (int i = 0; i < 50; i++) {
-    int leituraADC = analogRead(PINO_SENSOR_MQ2);
-    float tensaoSaida = leituraADC * (3.3 / 4095.0);  // ESP32 usa 3.3V e 12 bits
-    float Rs = (3.3 - tensaoSaida) / tensaoSaida * RESISTENCIA_CARGA;
-    somaRs += Rs;
-    delay(100);
-  }
+// Intervalo de leitura
+const int INTERVALO_LEITURA_MS = 1000;
 
-  float RsMedio = somaRs / 50;
-  Ro = RsMedio / 9.83;  // valor típico em ar limpo
-
-  Serial.print("✅ Calibração finalizada! Ro = ");
-  Serial.print(Ro);
-  Serial.println(" kΩ");
-
-  doc["calibrando"] = false;
-  doc["Ro"] = Ro;
-  doc["Rs"] = RsMedio;
-  serializeJson(doc, bufferJson);
-  clienteMQTT.publish("sensor/calibrando", bufferJson);
-}
-
-float calcularPPM(float razaoRsRo) {
-  float m = -0.47;
-  float b = 1.95;
-  return pow(10, ((log10(razaoRsRo) - b) / m));
-}
-
-void enviarDadosParaMQTT(int valorAnalogico, float ppm, bool chama, float temperatura, float umidade, bool coDetectado) {
-  Serial.println("📡 Enviando dados ao broker...");
-
-  StaticJsonDocument<200> doc;
-  doc["valorAnalogico_MQ2"] = valorAnalogico;
-  doc["ppm_MQ2"] = ppm;
-  doc["chamaDetectada"] = chama;
-  doc["temperatura"] = temperatura;
-  doc["umidade"] = umidade;
-  doc["coDetectado"] = coDetectado;
-
-  char bufferJson[256];
-  serializeJson(doc, bufferJson);
-  clienteMQTT.publish("sensor/valores", bufferJson);
-}
-
-void verificarConexaoMQTT() {
-  if (!clienteMQTT.connected()) {
-    reconectarMQTT();
-  }
-  clienteMQTT.loop();
-}
-
-void reconectarMQTT() {
-  while (!clienteMQTT.connected()) {
-    Serial.print("🔁 Tentando conectar ao MQTT... ");
-    String clientId = "ESP32Client-" + String(random(0xffff), HEX);
-    if (clienteMQTT.connect(clientId.c_str())) {
-      Serial.println("Conectado!");
-    } else {
-      Serial.print("Falha, rc=");
-      Serial.print(clienteMQTT.state());
-      Serial.println(" | Tentando novamente em 5s...");
-      delay(5000);
-    }
-  }
-}
-
-void configurarRecebimentoInformacao() {
-  // opcional
-}
+// === Protótipos ===
+void setup();
+void loop();
+void conectaWiFi();
+void reconnectMQTT();
+void calibrarMQ2();
+void calibrarMQ7();
+float calcularPPM_MQ2(float ratio);
+float calcularPPM_MQ7(float ratio);
+void enviarParaMQTT(float ppm2, float ppm7, bool chama, float temp, float hum);
 
 // === Setup ===
 void setup() {
   Serial.begin(115200);
-
-  WiFi.begin(ssid, senha);
-  Serial.print("Conectando ao Wi-Fi");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("\n✅ Wi-Fi conectado!");
-  Serial.print("IP do ESP32: ");
-  Serial.println(WiFi.localIP());
-
-  clienteMQTT.setServer(endereco_mqtt, porta_mqtt);
-  configurarRecebimentoInformacao();
-
-  dht.begin();
-
   pinMode(PINO_LED_PLACA, OUTPUT);
-  pinMode(PINO_SENSOR_CHAMA, INPUT);
-  pinMode(PINO_SENSOR_MQ7, INPUT);
-
-  calibrarSensorMQ2();
+  pinMode(PINO_CHAMA, INPUT);
+  conectaWiFi();
+  clienteMQTT.setServer(mqttServer, mqttPort);
+  dht.begin();
+  // Calibrar sensores em ar limpo
+  calibrarMQ2();
+  calibrarMQ7();
 }
 
 // === Loop principal ===
 void loop() {
-  verificarConexaoMQTT();
+  if (!clienteMQTT.connected()) reconnectMQTT();
+  clienteMQTT.loop();
 
   digitalWrite(PINO_LED_PLACA, HIGH);
-  delay(300);
+  delay(100);
   digitalWrite(PINO_LED_PLACA, LOW);
 
-  // Leitura do MQ-2
-  totalGas -= leiturasGas[indiceGas];
-  leiturasGas[indiceGas] = analogRead(PINO_SENSOR_MQ2);
-  totalGas += leiturasGas[indiceGas];
-  indiceGas = (indiceGas + 1) % NUM_AMOSTRAS;
-  int mediaGas = totalGas / NUM_AMOSTRAS;
-  if (mediaGas < 100) mediaGas = 0;
+  // --- MQ-2 ---
+  soma2 -= leiturasMQ2[idx2];
+  leiturasMQ2[idx2] = analogRead(PINO_MQ2);
+  soma2 += leiturasMQ2[idx2];
+  idx2 = (idx2 + 1) % NUM_AMOSTRAS;
+  float media2 = soma2 / NUM_AMOSTRAS;
+  float v2 = media2 * (3.3 / 4095.0);                 // ESP32: 12 bits, 3.3V
+  float Rs2 = (3.3 - v2) / v2 * RESISTENCIA_CARGA;     // Rs = (Vc/Vrl - 1) * RL
+  float ratio2 = Rs2 / Ro2;
+  float ppm2   = calcularPPM_MQ2(ratio2);
 
-  float tensao = mediaGas * (3.3 / 4095.0);  // ESP32: 12 bits e 3.3V
-  float Rs = (tensao > 0) ? (3.3 - tensao) / tensao * RESISTENCIA_CARGA : 0;
-  float razao = (Ro > 0) ? Rs / Ro : 0;
-  float ppm = (razao > 0) ? calcularPPM(razao) : 0;
+  // --- MQ-7 ---
+  soma7 -= leiturasMQ7[idx7];
+  leiturasMQ7[idx7] = analogRead(PINO_MQ7);
+  soma7 += leiturasMQ7[idx7];
+  idx7 = (idx7 + 1) % NUM_AMOSTRAS;
+  float media7 = soma7 / NUM_AMOSTRAS;
+  float v7     = media7 * (3.3 / 4095.0);
+  float Rs7    = (3.3 - v7) / v7 * RESISTENCIA_CARGA;
+  float ratio7 = Rs7 / Ro7;
+  float ppm7   = calcularPPM_MQ7(ratio7);
 
-  Serial.print("📈 MQ-2 (média): ");
-  Serial.print(mediaGas);
-  Serial.print(" | Rs/Ro: ");
-  Serial.print(razao);
-  Serial.print(" | Estimado (ppm): ");
-  Serial.println(ppm);
+  // --- Outros sensores ---
+  bool chamaDetectada = digitalRead(PINO_CHAMA) == LOW;
+  float umidade       = dht.readHumidity();
+  float temperatura   = dht.readTemperature();
 
-  // Chama
-  bool chamaDetectada = digitalRead(PINO_SENSOR_CHAMA) == LOW;
-  Serial.println(chamaDetectada ? "🔥 Chama detectada!" : "✅ Sem chama.");
+  Serial.printf("MQ-2: %.2f ppm | MQ-7(CO): %.2f ppm\n", ppm2, ppm7);
+  Serial.println(chamaDetectada ? "Chama detectada!" : "Sem chama.");
+  Serial.printf("Temp: %.1f °C | Umid: %.1f %%\n", temperatura, umidade);
 
-  // DHT11
-  float umidade = dht.readHumidity();
-  float temperatura = dht.readTemperature();
-  if (isnan(umidade) || isnan(temperatura)) {
-    Serial.println("⚠️ Erro ao ler DHT11.");
-  } else {
-    Serial.print("🌡️ Temp: ");
-    Serial.print(temperatura);
-    Serial.println(" °C");
-
-    Serial.print("💧 Umidade: ");
-    Serial.print(umidade);
-    Serial.println(" %");
-  }
-
-  // MQ-7
-  int leituraAnalogica = analogRead(PINO_SENSOR_MQ7);
-
-  int limiteCO = 1500; // valor de exemplo – depende da calibração
-
-  bool coDetectado = leituraAnalogica >= limiteCO;
-  Serial.println(leituraAnalogica);
-  Serial.println(coDetectado ? "⚠️ Monóxido de carbono detectado!" : "✅ Sem gás tóxico.");
-
-  // Enviar para MQTT
-  enviarDadosParaMQTT(mediaGas, ppm, chamaDetectada, temperatura, umidade, coDetectado);
+  enviarParaMQTT(ppm2, ppm7, chamaDetectada, temperatura, umidade);
   delay(INTERVALO_LEITURA_MS);
+}
+
+// === Conexões ===
+void conectaWiFi() {
+  WiFi.begin(ssid, senha);
+  Serial.print("Conectando ao Wi-Fi");
+  while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
+  Serial.printf("\nConectado! IP: %s\n", WiFi.localIP().toString().c_str());
+}
+
+void reconnectMQTT() {
+  while (!clienteMQTT.connected()) {
+    Serial.print("Tentando MQTT...");
+    if (clienteMQTT.connect("ESP32Client")) Serial.println("Conectado MQTT");
+    else { Serial.printf("Erro rc=%d\n", clienteMQTT.state()); delay(2000); }
+  }
+}
+
+// === Calibração MQ ===
+void calibrarMQ2() {
+  Serial.println("Calibrando MQ-2 em ar limpo...");
+  float sum = 0;
+  for (int i = 0; i < 50; i++) {
+    float v = analogRead(PINO_MQ2) * (3.3/4095.0);
+    float Rs = (3.3 - v)/v * RESISTENCIA_CARGA;
+    sum += Rs;
+    delay(100);
+  }
+  Ro2 = (sum/50) / 9.83;  // 9.83: valor típico Rs/Ro em ar limpo (MQ-2 p/ GLP) fileciteturn0file1
+  Serial.printf("Ro2 = %.2f kΩ\n", Ro2);
+}
+
+void calibrarMQ7() {
+  Serial.println("Calibrando MQ-7 em ar limpo...");
+  float sum = 0;
+  for (int i = 0; i < 50; i++) {
+    float v = analogRead(PINO_MQ7) * (3.3/4095.0);
+    float Rs = (3.3 - v)/v * RESISTENCIA_CARGA;
+    sum += Rs;
+    delay(100);
+  }
+  // Sensitivity S = Rs(air)/Rs(100ppmCO) ≥ 5 fileciteturn0file0
+  Ro7 = (sum/50) / 5.0;
+  Serial.printf("Ro7 = %.2f kΩ\n", Ro7);
+}
+
+// === Cálculo de PPM ===
+float calcularPPM_MQ2(float ratio) {
+  const float m = -0.47;
+  const float b = 1.95;
+  return pow(10, (log10(ratio) - b) / m);  // curva MQ-2 p/ GLP fileciteturn0file1
+}
+
+float calcularPPM_MQ7(float ratio) {
+  // coeficientes aproximados para MQ-7 (CO) a partir da Fig.1:
+  const float m = -0.77;
+  const float b = 2.02;
+  return pow(10, (log10(ratio) - b) / m);  // curva MQ-7 CO fileciteturn0file0
+}
+
+// === Envio MQTT ===
+void enviarParaMQTT(float ppm2, float ppm7, bool chama, float temp, float hum) {
+  StaticJsonDocument<256> doc;
+  doc["ppm_MQ2"]   = ppm2;
+  doc["ppm_CO_MQ7"] = ppm7;
+  doc["chamaDetectada"] = chama;
+  doc["temperatura"]= temp;
+  doc["umidade"]    = hum;
+  char buf[256]; serializeJson(doc, buf);
+  clienteMQTT.publish("sensor/valores", buf);
 }
