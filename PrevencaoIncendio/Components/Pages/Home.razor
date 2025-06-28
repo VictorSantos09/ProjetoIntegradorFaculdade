@@ -52,6 +52,7 @@
     <RadzenText TextStyle="TextStyle.Subtitle1">Próxima consulta: <b>@TempoRestanteFormatado</b></RadzenText>
     <RadzenText TextStyle="TextStyle.Subtitle2">Frequência de busca: <b>@TempoBuscaFormatado</b></RadzenText>
     <RadzenText TextStyle="TextStyle.Subtitle2">Período da média: <b>@dangerParameters.DataInicioMedia.GetValueOrDefault(_buscaPadraoInicialMedia).ToString("dd/MM/yyyy HH:mm")</b> a <b>@dangerParameters.DataFimMedia.GetValueOrDefault(_buscaPadraoFimMedia).ToString("dd/MM/yyyy HH:mm")</b></RadzenText>
+    <RadzenText TextStyle="TextStyle.Subtitle2"><b>Percentual de diferença: @dangerParameters.PercentualDiferenca%</b></RadzenText>
     <RadzenText TextStyle="TextStyle.Subtitle2" Class="rz-mt-1">
         <i>As medianas são utilizadas por serem menos sensíveis a valores extremos ou leituras atípicas dos sensores, tornando a análise mais robusta e confiável.</i>
     </RadzenText>
@@ -105,17 +106,12 @@
             <RadzenDataGridColumn Property="@nameof(Valores.LeituraEm)" Title="Data e hora" TextAlign="TextAlign.Center" FormatString="{0:dd/MM/yyyy HH:mm}" SortOrder="SortOrder.Descending" OrderIndex="1" />
             <RadzenDataGridColumn Property="@nameof(Valores.temperatura)" Title="Temperatura (°C)" TextAlign="TextAlign.Center" />
             <RadzenDataGridColumn Property="@nameof(Valores.umidade)" Title="Umidade" TextAlign="TextAlign.Center" />
-            <RadzenDataGridColumn Property="@nameof(Valores.ppm_MQ2)" Title="PPM" TextAlign="TextAlign.Center" />
+            <RadzenDataGridColumn Property="@nameof(Valores.ppm_MQ2)" Title="PPM Fumaça" TextAlign="TextAlign.Center" />
+            <RadzenDataGridColumn Property="@nameof(Valores.ppm_CO_MQ7)" Title="PPM Co" TextAlign="TextAlign.Center" />
             <RadzenDataGridColumn Title="Fogo" TextAlign="TextAlign.Center">
                 <Template Context="valor">
                     <RadzenIcon Icon="@(valor.chamaDetectada ? "check_circle" : "cancel")"
                                 Style="@(valor.chamaDetectada ? "color:green;" : "color:red;")" />
-                </Template>
-            </RadzenDataGridColumn>
-            <RadzenDataGridColumn Title="Co Detectado" TextAlign="TextAlign.Center">
-                <Template Context="valor">
-                    <RadzenIcon Icon="@(valor.coDetectado ? "check_circle" : "cancel")"
-                                Style="@(valor.coDetectado ? "color:green;" : "color:red;")" />
                 </Template>
             </RadzenDataGridColumn>
         </Columns>
@@ -235,6 +231,7 @@
                 valorAtual.temperatura = valorAtual.temperatura;
                 valorAtual.umidade = Math.Round(valorAtual.umidade, casasDecimais);
                 valorAtual.ppm_MQ2 = Math.Round(valorAtual.ppm_MQ2, casasDecimais);
+                valorAtual.ppm_CO_MQ7 = Math.Round(valorAtual.ppm_CO_MQ7, casasDecimais);
 
                 VerificarRiscoPerigo(valorAtual);
                 VerificarRiscoPerigoMedia();
@@ -320,9 +317,9 @@
         {
             ("Temperatura", @<RadzenText>@($"{valorAtual.temperatura:F2} °C")</RadzenText>, IconeTemperatura, null),
         ("Umidade", @<RadzenText>@($"{valorAtual.umidade:F2} %")</RadzenText>, IconeUmidade, null),
-        ("PPM", @<RadzenText>@($"{valorAtual.ppm_MQ2:F2}")</RadzenText>, IconePPM, "Parte por milhão de concentração de gases."),
+        ("PPM Fumaça", @<RadzenText>@($"{valorAtual.ppm_MQ2:F2}")</RadzenText>, IconePPM, "Parte por milhão de concentração de gases."),
+        ("PPM Co", @<RadzenText>@($"{valorAtual.ppm_CO_MQ7:F2}")</RadzenText>, IconeCo, "Parte por milhão de concentração de carbono."),
         ("Chama / Fogo", CheckIcon(valorAtual.chamaDetectada), IconeFogo, "Detecção de chama ou fogo."),
-            ("Monóxido de carbono", CheckIcon(valorAtual.coDetectado), IconeCo, "Detecção de monóxido de carbono."),
         }
     ;
 }
@@ -341,8 +338,8 @@ private IEnumerable<(string Label, RenderFragment ValueContent, string Icon, str
         ("Temperatura", @<RadzenText>@($"{valorMedia.temperatura:F2} °C")</RadzenText>, IconeTemperatura, null),
     ("Umidade", @<RadzenText>@($"{valorMedia.umidade:F2} %")</RadzenText>, IconeUmidade, null),
     ("PPM", @<RadzenText>@($"{valorMedia.ppm_MQ2:F2}")</RadzenText>, IconePPM, "Média de concentração de gases."),
-    ("Chama", CheckIcon(valorMedia.chamaDetectada), IconeFogo, "Detecção de chama média."),
-        ("Monóxido de carbono", CheckIcon(valorMedia.coDetectado), IconeCo, "Detecção média de monóxido de carbono.")
+    ("PPM Co", @<RadzenText>@($"{valorMedia.ppm_CO_MQ7:F2}")</RadzenText>, IconeCo, "Média de monóxido de carbono."),
+("Chama", CheckIcon(valorMedia.chamaDetectada), IconeFogo, "Detecção de chama média."),
     }
 ;
     }
@@ -362,11 +359,10 @@ private static Valores CriarValorAtualVazio()
     return new Valores()
     {
         chamaDetectada = false,
-        coDetectado = false,
+        ppm_CO_MQ7 = 0,
         ppm_MQ2 = 0,
         temperatura = 0,
         umidade = 0,
-        valorAnalogico_MQ2 = 0
     };
 }
 private void VerificarRiscoPerigo(Valores valores)
@@ -383,7 +379,7 @@ private void VerificarRiscoPerigo(Valores valores)
 
         AddIfNotExists(new Alerta(Variant.Filled, AlertStyle.Danger, AlertSize.Large, Shade.Default, IconeFogo, "Fogo detectado.", AlertLevel.Fire));
     }
-    if (valores.coDetectado)
+    if (valores.CoNaoSeguro)
     {
         temPerigo = true;
         riscoPerigo = NotificationSeverity.Error;
@@ -398,7 +394,6 @@ private void VerificarRiscoPerigo(Valores valores)
 
         AddIfNotExists(new Alerta(Variant.Filled, AlertStyle.Warning, AlertSize.Large, Shade.Default, Icon, "Ambiente em potencial risco, verifique.", AlertLevel.Warning));
     }
-    // danger It is dangerous if the temperature sensor detects a temperature above 45°C or the smoke sensor detects smoke levels above 700 ppm and the flame sensor detect fire.
     else if (valores.temperatura > dangerParameters.Alto.Temperatura || valores.ppm_MQ2 > dangerParameters.Alto.Ppm && valores.chamaDetectada)
     {
         temPerigo = true;
@@ -427,18 +422,7 @@ private void VerificarRiscoPerigoMedia()
     VerificarVariacaoRelativa("Temperatura", valorAtual.temperatura, valorMedia.temperatura, margemPercentual, IconeTemperatura, AlertLevel.MediaTemperatura);
     VerificarVariacaoRelativa("Umidade", valorAtual.umidade, valorMedia.umidade, margemPercentual, IconeUmidade, AlertLevel.MediaUmidade);
     VerificarVariacaoRelativa("Fumaça", valorAtual.ppm_MQ2, valorMedia.ppm_MQ2, margemPercentual, IconePPM, AlertLevel.MediaPpm);
-
-    if (valorAtual.coDetectado != valorMedia.coDetectado)
-    {
-        AddIfNotExists(new Alerta(
-            Variant.Filled,
-            AlertStyle.Warning,
-            AlertSize.Large,
-            Shade.Default,
-            IconeCo,
-            "Estado de monóxido de carbono diferente da média.",
-            AlertLevel.Co));
-    }
+    VerificarVariacaoRelativa("Monóxido de carbono", valorAtual.ppm_CO_MQ7, valorMedia.ppm_CO_MQ7, margemPercentual, IconeCo, AlertLevel.MediaCo);
 
     if (valorAtual.chamaDetectada != valorMedia.chamaDetectada)
     {

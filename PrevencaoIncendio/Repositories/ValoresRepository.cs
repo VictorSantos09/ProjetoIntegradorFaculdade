@@ -81,7 +81,7 @@ public class ValoresRepository : Repository, IValoresRepository
                                 { "umidades", new BsonDocument("$push", "$umidade") },
                                 { "ppms", new BsonDocument("$push", "$ppm_MQ2") },
                                 { "detectadoFogo", new BsonDocument("$max", new BsonDocument("$cond", new BsonArray { "$chamaDetectada", 1, 0 })) },
-                                { "detectadoCO", new BsonDocument("$max", new BsonDocument("$cond", new BsonArray { "$coDetectado", 1, 0 })) }
+                                { "detectadoCO", new BsonDocument("$max", new BsonDocument("$cond", new BsonArray { "ppm_CO_MQ7", 1, 0 })) }
                             };
 
         var pipeline = _collection.Aggregate()
@@ -106,43 +106,42 @@ public class ValoresRepository : Repository, IValoresRepository
             umidade = Mediana(d["umidades"].AsBsonArray.Select(x => x.ToDouble()).ToList()),
             ppm_MQ2 = Mediana(d["ppms"].AsBsonArray.Select(x => x.ToDouble()).ToList()),
             chamaDetectada = d.GetValue("detectadoFogo", 0).ToInt32() == 1,
-            coDetectado = d.GetValue("detectadoCO", 0).ToInt32() == 1
+            ppm_CO_MQ7 = d.GetValue("detectadoCO", 0).ToDouble(),
         });
     }
 
     public async Task<Valores> GetNextAveragesAsync(DateTime inicio, DateTime fim, int horasGrupo = 1)
     {
         var pipeline = _collection.Aggregate()
-            .Match(v => v.LeituraEm >= inicio && v.LeituraEm <= fim)
-            .Group(new BsonDocument
+    .Match(v => v.LeituraEm >= inicio && v.LeituraEm <= fim)
+    .Group(new BsonDocument
+    {
+        { "_id", new BsonDocument
             {
-            {
-                "_id", new BsonDocument
-                {
-                    { "ano", new BsonDocument("$year", "$LeituraEm") },
-                    { "mes", new BsonDocument("$month", "$LeituraEm") },
-                    { "dia", new BsonDocument("$dayOfMonth", "$LeituraEm") },
-                    { "blocoTempo", new BsonDocument(
-                        "$subtract", new BsonArray
+                { "ano",       new BsonDocument("$year", "$LeituraEm") },
+                { "mes",       new BsonDocument("$month", "$LeituraEm") },
+                { "dia",       new BsonDocument("$dayOfMonth", "$LeituraEm") },
+                { "blocoTempo", new BsonDocument("$subtract", new BsonArray
+                    {
+                        new BsonDocument("$hour", "$LeituraEm"),
+                        new BsonDocument("$mod", new BsonArray
                         {
                             new BsonDocument("$hour", "$LeituraEm"),
-                            new BsonDocument("$mod", new BsonArray
-                            {
-                                new BsonDocument("$hour", "$LeituraEm"),
-                                horasGrupo
-                            })
+                            horasGrupo
                         })
-                    }
+                    })
                 }
-            },
-            { "TemperaturaMedia", new BsonDocument("$avg", "$temperatura") },
-            { "UmidadeMedia", new BsonDocument("$avg", "$umidade") },
-            { "FumacaMedia", new BsonDocument("$avg", "$ppm_MQ2") },
-            { "CO2Media", new BsonDocument("$avg", new BsonDocument("$cond", new BsonArray { "$coDetectado", 1, 0 })) },
-            { "ChamaMedia", new BsonDocument("$avg", new BsonDocument("$cond", new BsonArray { "$chamaDetectada", 1, 0 })) },
-            { "LeituraMaisRecente", new BsonDocument("$max", "$LeituraEm") }
-            })
-            .Sort(Builders<BsonDocument>.Sort.Ascending("_id"));
+            }
+        },
+        { "temperaturas", new BsonDocument("$push", "$temperatura") },
+        { "umidades",     new BsonDocument("$push", "$umidade") },
+        { "fumacas",      new BsonDocument("$push", "$ppm_MQ2") },
+        { "coDetectados", new BsonDocument("$push", "$ppm_CO_MQ7") },    // <<< corrige aqui
+        { "chamasDetectadas", new BsonDocument("$push", "$chamaDetectada") },
+        { "LeituraMaisRecente", new BsonDocument("$max", "$LeituraEm") }
+    })
+    .Sort(Builders<BsonDocument>.Sort.Ascending("_id"));
+
 
         var documentos = await pipeline.ToListAsync();
 
@@ -154,7 +153,7 @@ public class ValoresRepository : Repository, IValoresRepository
                 temperatura = ((float)d.GetValue("TemperaturaMedia", 0).ToDouble()),
                 umidade = d.GetValue("UmidadeMedia", 0).ToDouble(),
                 ppm_MQ2 = d.GetValue("FumacaMedia", 0).ToDouble(),
-                coDetectado = d.GetValue("CO2Media", 0).ToDouble() >= 0.5,
+                ppm_CO_MQ7 = d.GetValue("CO2Media", 0).ToDouble(),
                 chamaDetectada = d.GetValue("ChamaMedia", 0).ToDouble() >= 0.5
             };
         });
@@ -164,7 +163,7 @@ public class ValoresRepository : Repository, IValoresRepository
             temperatura = resultados.Average(v => v.temperatura),
             umidade = resultados.Average(v => v.umidade),
             ppm_MQ2 = resultados.Average(v => v.ppm_MQ2),
-            coDetectado = resultados.Average(v => v.coDetectado ? 1 : 0) >= 0.5,
+            ppm_CO_MQ7 = resultados.Average(v => v.ppm_CO_MQ7),
             chamaDetectada = resultados.Average(v => v.chamaDetectada ? 1 : 0) >= 0.5,
             LeituraEm = resultados.Max(v => v.LeituraEm)
         };
@@ -176,14 +175,12 @@ public class ValoresRepository : Repository, IValoresRepository
             .Match(v => v.LeituraEm >= inicio && v.LeituraEm <= fim)
             .Group(new BsonDocument
             {
-            {
-                "_id", new BsonDocument
+            { "_id", new BsonDocument
                 {
-                    { "ano", new BsonDocument("$year", "$LeituraEm") },
-                    { "mes", new BsonDocument("$month", "$LeituraEm") },
-                    { "dia", new BsonDocument("$dayOfMonth", "$LeituraEm") },
-                    { "blocoTempo", new BsonDocument(
-                        "$subtract", new BsonArray
+                    { "ano",   new BsonDocument("$year", "$LeituraEm") },
+                    { "mes",   new BsonDocument("$month", "$LeituraEm") },
+                    { "dia",   new BsonDocument("$dayOfMonth", "$LeituraEm") },
+                    { "blocoTempo", new BsonDocument("$subtract", new BsonArray
                         {
                             new BsonDocument("$hour", "$LeituraEm"),
                             new BsonDocument("$mod", new BsonArray
@@ -195,39 +192,48 @@ public class ValoresRepository : Repository, IValoresRepository
                     }
                 }
             },
-            { "temperaturas", new BsonDocument("$push", "$temperatura") },
-            { "umidades", new BsonDocument("$push", "$umidade") },
-            { "fumacas", new BsonDocument("$push", "$ppm_MQ2") },
-            { "coDetectados", new BsonDocument("$push", "$coDetectado") },
-            { "chamasDetectadas", new BsonDocument("$push", "$chamaDetectada") },
-            { "LeituraMaisRecente", new BsonDocument("$max", "$LeituraEm") }
+            { "temperaturas",      new BsonDocument("$push", "$temperatura") },
+            { "umidades",          new BsonDocument("$push", "$umidade") },
+            { "fumacas",           new BsonDocument("$push", "$ppm_MQ2") },
+            { "coDetectados",      new BsonDocument("$push", "$ppm_CO_MQ7") },  // <<< Descomente e use '$ppm_CO_MQ7'
+            { "chamasDetectadas",  new BsonDocument("$push", "$chamaDetectada") },
+            { "LeituraMaisRecente",new BsonDocument("$max",  "$LeituraEm") }
             })
             .Sort(Builders<BsonDocument>.Sort.Ascending("_id"));
 
         var documentos = await pipeline.ToListAsync();
 
-        var resultados = documentos.Select(d => new Valores
+        var resultados = documentos.Select(d =>
         {
-            LeituraEm = d["LeituraMaisRecente"].ToUniversalTime(),
-            temperatura = (float)Mediana(d["temperaturas"].AsBsonArray.Select(v => v.ToDouble()).ToList()),
-            umidade = Mediana(d["umidades"].AsBsonArray.Select(v => v.ToDouble()).ToList()),
-            ppm_MQ2 = Mediana(d["fumacas"].AsBsonArray.Select(v => v.ToDouble()).ToList()),
-            coDetectado = Mediana(d["coDetectados"].AsBsonArray.Select(v => v.ToBoolean() ? 1.0 : 0.0).ToList()) >= 0.5,
-            chamaDetectada = Mediana(d["chamasDetectadas"].AsBsonArray.Select(v => v.ToBoolean() ? 1.0 : 0.0).ToList()) >= 0.5
+            // Extrai arrays e trata possíveis vazios
+            var tempArr = d["temperaturas"].AsBsonArray.Select(x => x.ToDouble()).ToList();
+            var humArr = d["umidades"].AsBsonArray.Select(x => x.ToDouble()).ToList();
+            var mq2Arr = d["fumacas"].AsBsonArray.Select(x => x.ToDouble()).ToList();
+            var coArr = d["coDetectados"].AsBsonArray.Select(x => x.ToDouble()).ToList();
+            var chamaArr = d["chamasDetectadas"].AsBsonArray.Select(x => x.ToBoolean() ? 1.0 : 0.0).ToList();
+
+            return new Valores
+            {
+                LeituraEm = d["LeituraMaisRecente"].ToUniversalTime(),
+                temperatura = tempArr.Any() ? (float)Mediana(tempArr) : 0f,
+                umidade = humArr.Any() ? (float)Mediana(humArr) : 0f,
+                ppm_MQ2 = mq2Arr.Any() ? (float)Mediana(mq2Arr) : 0f,
+                ppm_CO_MQ7 = coArr.Any() ? Mediana(coArr) : 0d,
+                chamaDetectada = Mediana(chamaArr) >= 0.5
+            };
         });
 
-        // Resultado geral: agregação final com mediana entre os blocos
+        // Agregação final: mediana dos blocos
         var lista = resultados.ToList();
         return new Valores
         {
             LeituraEm = lista.Max(v => v.LeituraEm),
-            temperatura = (float)Mediana(lista.Select(v => (double)v.temperatura).ToList()),
+            temperatura = (float)Mediana(lista.Select(v => v.temperatura).Select(x => (double)x).ToList()),
             umidade = (float)Mediana(lista.Select(v => (double)v.umidade).ToList()),
             ppm_MQ2 = (float)Mediana(lista.Select(v => (double)v.ppm_MQ2).ToList()),
-            coDetectado = Mediana(lista.Select(v => v.coDetectado ? 1.0 : 0.0).ToList()) >= 0.5,
+            ppm_CO_MQ7 = Mediana(lista.Select(v => (double)v.ppm_CO_MQ7).ToList()),
             chamaDetectada = Mediana(lista.Select(v => v.chamaDetectada ? 1.0 : 0.0).ToList()) >= 0.5
         };
-
     }
 
     private static double Mediana(List<double> valores)

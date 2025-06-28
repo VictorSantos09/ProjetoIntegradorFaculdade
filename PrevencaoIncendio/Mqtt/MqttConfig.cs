@@ -26,12 +26,11 @@ public class MqttConfig
     {
         var valores = new Valores
         {
-            valorAnalogico_MQ2 = Random.Shared.Next(1023),
             ppm_MQ2 = Random.Shared.Next(1023),
             chamaDetectada = true,
             temperatura = Random.Shared.Next(50),
             umidade = Random.Shared.Next(100),
-            coDetectado = false,
+            ppm_CO_MQ7 = Random.Shared.Next(4095),
             LeituraEm = DateTime.Now
         };
         var jsonString = JsonSerializer.Serialize(valores);
