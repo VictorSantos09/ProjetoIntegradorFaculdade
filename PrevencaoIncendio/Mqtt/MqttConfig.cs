@@ -24,15 +24,38 @@ public class MqttConfig
     }
     private static void OnTimedEvent(object source, System.Timers.ElapsedEventArgs e)
     {
+        var random = new Random();
+
         var valores = new Valores
         {
-            ppm_MQ2 = Random.Shared.Next(1023),
-            chamaDetectada = true,
-            temperatura = Random.Shared.Next(50),
-            umidade = Random.Shared.Next(100),
-            ppm_CO_MQ7 = Random.Shared.Next(4095),
+            // MQ-2: ppm realista entre 200 e 800 (simula fumaça moderada)
+            ppm_MQ2 = random.NextDouble() switch
+            {
+                < 0.1 => random.Next(800, 1200),  // 10% chance de valor alto (alarme)
+                < 0.9 => random.Next(200, 600),   // 80% chance de valor moderado
+                _ => random.Next(0, 200)      // 10% chance de valor baixo
+            },
+
+            // Chama: simula intermitência
+            chamaDetectada = random.NextDouble() < 0.2, // 20% de chance de detectar chama
+
+            // Temperatura: valores entre 18 e 35 °C
+            temperatura = ((float)Math.Round(18 + random.NextDouble() * 17, 1)),
+
+            // Umidade: entre 40% e 80%
+            umidade = Math.Round(40 + random.NextDouble() * 40, 1),
+
+            // MQ-7 (CO): valores típicos entre 10 e 400 ppm
+            ppm_CO_MQ7 = random.NextDouble() switch
+            {
+                < 0.05 => random.Next(400, 1000),  // picos
+                < 0.9 => random.Next(30, 250),    // normal
+                _ => random.Next(0, 30)       // limpo
+            },
+
             LeituraEm = DateTime.Now
         };
+
         var jsonString = JsonSerializer.Serialize(valores);
 
         MqttMensagem.OnMensagemRecebida("sensor/#", jsonString);
