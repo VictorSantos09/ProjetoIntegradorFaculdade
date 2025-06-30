@@ -8,8 +8,15 @@
 @inject NotificationService NotificationService
 @inject DangerParameters dangerParameters
 @inject IValoresRepository ValoresRepository
+@inject IJSRuntime JSRuntime
+@inject DialogService ConfirmService
 
 <PageTitle>Início - Painel de Monitoramento</PageTitle>
+
+<audio id="myAudio" controls hidden>
+    <source src="/audios/danger.mp3" type="audio/mpeg">
+    Your browser does not support the audio element.
+</audio>
 
 <RadzenStack Gap="20px">
     <!-- Alertas ativos -->
@@ -190,11 +197,47 @@
     }
     private PeriodicTimer? _periodicTimer;
     private CancellationTokenSource? _cancellationTokenSource;
+    private bool _playingAudio = false;
+    private bool audioEnabled = false;
+
+
+    private async Task PlayAudio()
+    {
+        await JSRuntime.InvokeVoidAsync("playAudio", "myAudio");
+    }
+
+    private async Task PauseAudio()
+    {
+        await JSRuntime.InvokeVoidAsync("pauseAudio", "myAudio");
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
+              // Exibe o modal de confirmação
+            var result = await ConfirmService.Confirm(
+                message: "Para que os alertas sonoros funcionem corretamente, por favor habilite o áudio agora.",
+                title: "Permissão para Áudio",
+                options: new ConfirmOptions()
+                {
+                    OkButtonText = "Habilitar Áudio",
+                    CancelButtonText = "Ignorar",
+                    ShowClose = false,
+                    Width = "400px"
+                }
+            );
+
+            audioEnabled = result == true;
+            StateHasChanged();
+
+            // Se quiser, já pode pré-carregar ou testar o audio aqui
+            if (audioEnabled)
+            {
+                await JSRuntime.InvokeVoidAsync("playAudio", "myAudio");
+                await JSRuntime.InvokeVoidAsync("pauseAudio", "myAudio");
+            }
+
             _cancellationTokenSource = new CancellationTokenSource();
             _periodicTimer = new PeriodicTimer(TimeSpan.FromMilliseconds(dangerParameters.TempoBuscaMediaMs));
 
@@ -233,7 +276,7 @@
                 valorAtual.ppm_MQ2 = Math.Round(valorAtual.ppm_MQ2, casasDecimais);
                 valorAtual.ppm_CO_MQ7 = Math.Round(valorAtual.ppm_CO_MQ7, casasDecimais);
 
-                VerificarRiscoPerigo(valorAtual);
+                await VerificarRiscoPerigo(valorAtual);
                 VerificarRiscoPerigoMedia();
 
                 _Leituras.Add(valorAtual);
@@ -339,7 +382,7 @@ private IEnumerable<(string Label, RenderFragment ValueContent, string Icon, str
     ("Umidade", @<RadzenText>@($"{valorMedia.umidade:F2} %")</RadzenText>, IconeUmidade, null),
     ("PPM Fumaça", @<RadzenText>@($"{valorMedia.ppm_MQ2:F2}")</RadzenText>, IconePPM, "Média de concentração de gases."),
     ("PPM Co", @<RadzenText>@($"{valorMedia.ppm_CO_MQ7:F2}")</RadzenText>, IconeCo, "Média de monóxido de carbono."),
-("Chama / Fogo", CheckIcon(valorMedia.chamaDetectada), IconeFogo, "Detecção de chama média."),
+    ("Chama / Fogo", CheckIcon(valorMedia.chamaDetectada), IconeFogo, "Detecção de chama média."),
     }
 ;
     }
@@ -365,7 +408,7 @@ private static Valores CriarValorAtualVazio()
         umidade = 0,
     };
 }
-private void VerificarRiscoPerigo(Valores valores)
+private async Task VerificarRiscoPerigo(Valores valores)
 {
     // Referência: https://pubs.aip.org/aip/acp/article-abstract/2431/1/090004/2906139/Home-fire-early-warning-system-using-flame-smoke
     NotificationSeverity riscoPerigo = NotificationSeverity.Info;
@@ -404,6 +447,26 @@ private void VerificarRiscoPerigo(Valores valores)
 
     if (temPerigo)
     {
+        if (!_playingAudio && audioEnabled)
+        {
+            _playingAudio = true;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await PlayAudio();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Erro ao tocar áudio: {ex.Message}");
+                }
+                finally
+                {
+                    _playingAudio = false;
+                }
+            });
+        }
+
         NotificationService.Notify(new NotificationMessage
         {
             Severity = riscoPerigo,

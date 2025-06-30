@@ -18,6 +18,47 @@
     <Routes @rendermode="@RenderMode.InteractiveServer" />
     <script src="_framework/blazor.web.js"></script>
     <script src="_content/Radzen.Blazor/Radzen.Blazor.js?v=@(typeof(Radzen.Colors).Assembly.GetName().Version)"></script>
+
+    <script>
+        let audioUnlocked = false;
+
+        window.playAudio = function (id) {
+            const audio = document.getElementById(id);
+            if (audio && audioUnlocked) {
+                audio.currentTime = 0;
+                audio.play().catch(err => console.warn("playAudio erro:", err));
+            }
+        }
+
+        window.pauseAudio = function (id) {
+            const audio = document.getElementById(id);
+            if (audio) {
+                audio.pause();
+                audio.currentTime = 0;
+            }
+        }
+
+        // Desbloqueio após primeiro clique
+        document.addEventListener("click", () => {
+            if (!audioUnlocked) {
+                const audio = document.getElementById("myAudio");
+                if (audio) {
+                    audio.muted = true;
+                    audio.play().then(() => {
+                        audio.pause();
+                        audio.currentTime = 0;
+                        audio.muted = false;
+                        audioUnlocked = true;
+                        console.log("✅ Áudio desbloqueado.");
+                    }).catch(err => {
+                        console.warn("Erro ao desbloquear áudio:", err);
+                    });
+                }
+            }
+        }, { once: true });
+    </script>
+
+
 </body>
 
 </html>
