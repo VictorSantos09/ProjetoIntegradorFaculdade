@@ -46,16 +46,11 @@
         </RadzenChart>
     </div>
 
-    <!-- Gráfico 2: Fogo e Monóxido Detectado -->
+    <!-- Gráfico 2: Fogo Detectado -->
     <div>
-        <h3>Fogo e Monóxido Detectado</h3>
+        <h3>Fogo</h3>
         <RadzenChart Style="height: 300px;">
             <RadzenLineSeries Data="@ProcessedData" CategoryProperty="Hora" ValueProperty="FogoDetectado" Title="Fogo Detectado">
-                <RadzenMarkers Visible="@showMarkers" MarkerType="MarkerType.Triangle" />
-                <RadzenSeriesDataLabels Visible="@showDataLabels" />
-            </RadzenLineSeries>
-
-            <RadzenLineSeries Data="@ProcessedData" CategoryProperty="Hora" ValueProperty="Co" Title="Monóxido Detectado">
                 <RadzenMarkers Visible="@showMarkers" MarkerType="MarkerType.Triangle" />
                 <RadzenSeriesDataLabels Visible="@showDataLabels" />
             </RadzenLineSeries>
@@ -75,15 +70,20 @@
 
     <!-- Gráfico 3: PPM -->
     <div>
-        <h3>PPM MQ2</h3>
-        <RadzenChart Style="height: 300px;">
-            <RadzenLineSeries Data="@ProcessedData" CategoryProperty="Hora" ValueProperty="PPM" Title="PPM MQ2">
-                <RadzenMarkers Visible="@showMarkers" MarkerType="MarkerType.Square" />
+        <h3>PPM Fumaça e Monóxido</h3>
+        <RadzenChart>
+            <RadzenLineSeries Data="@ProcessedData" CategoryProperty="Hora" ValueProperty="Co" Title="Co">
+                <RadzenMarkers Visible="@showMarkers" MarkerType="MarkerType.Diamond" />
+                <RadzenSeriesDataLabels Visible="@showDataLabels" />
+            </RadzenLineSeries>
+
+            <RadzenLineSeries Data="@ProcessedData" CategoryProperty="Hora" ValueProperty="PPM" Title="Fumaça">
+                <RadzenMarkers Visible="@showMarkers" MarkerType="MarkerType.Diamond" />
                 <RadzenSeriesDataLabels Visible="@showDataLabels" />
             </RadzenLineSeries>
 
             <RadzenValueAxis>
-                <RadzenAxisTitle Text="PPM" />
+                <RadzenAxisTitle Text="Valores" />
                 <RadzenGridLines Visible="true" />
             </RadzenValueAxis>
 

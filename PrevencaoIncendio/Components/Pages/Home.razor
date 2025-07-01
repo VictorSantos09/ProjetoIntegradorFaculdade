@@ -10,6 +10,7 @@
 @inject IValoresRepository ValoresRepository
 @inject IJSRuntime JSRuntime
 @inject DialogService ConfirmService
+@implements IDisposable
 
 <PageTitle>Início - Painel de Monitoramento</PageTitle>
 
@@ -200,7 +201,6 @@
     private bool _playingAudio = false;
     private bool audioEnabled = false;
 
-
     private async Task PlayAudio()
     {
         await JSRuntime.InvokeVoidAsync("playAudio", "myAudio");
@@ -215,7 +215,7 @@
     {
         if (firstRender)
         {
-              // Exibe o modal de confirmação
+            // Exibe o modal de confirmação
             var result = await ConfirmService.Confirm(
                 message: "Para que os alertas sonoros funcionem corretamente, por favor habilite o áudio agora.",
                 title: "Permissão para Áudio",
@@ -525,6 +525,10 @@ private void VerificarVariacaoRelativa(
     }
 }
 
+public void Dispose()
+{
+    MqttMensagem.MensagemRecebida -= OnMqttMensagemRecebida;
+}
 
 private void AddIfNotExists(Alerta alerta)
 {

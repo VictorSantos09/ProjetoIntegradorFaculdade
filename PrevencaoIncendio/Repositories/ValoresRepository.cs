@@ -81,7 +81,7 @@ public class ValoresRepository : Repository, IValoresRepository
                                 { "umidades", new BsonDocument("$push", "$umidade") },
                                 { "ppms", new BsonDocument("$push", "$ppm_MQ2") },
                                 { "detectadoFogo", new BsonDocument("$max", new BsonDocument("$cond", new BsonArray { "$chamaDetectada", 1, 0 })) },
-                                { "detectadoCO", new BsonDocument("$max", new BsonDocument("$cond", new BsonArray { "ppm_CO_MQ7", 1, 0 })) }
+                                { "co",  new BsonDocument("$push", "$ppm_CO_MQ7") }
                             };
 
         var pipeline = _collection.Aggregate()
@@ -106,7 +106,7 @@ public class ValoresRepository : Repository, IValoresRepository
             umidade = Mediana(d["umidades"].AsBsonArray.Select(x => x.ToDouble()).ToList()),
             ppm_MQ2 = Mediana(d["ppms"].AsBsonArray.Select(x => x.ToDouble()).ToList()),
             chamaDetectada = d.GetValue("detectadoFogo", 0).ToInt32() == 1,
-            ppm_CO_MQ7 = d.GetValue("detectadoCO", 0).ToDouble(),
+            ppm_CO_MQ7 = Mediana(d["co"].AsBsonArray.Select(x => x.ToDouble()).ToList()),
         });
     }
 
