@@ -4,9 +4,10 @@ public class DangerParameters
 {
     public double PercentualDiferenca { get; set; }
     public double Co { get; set; }
-    public long TempoBuscaMediaMs { get; set; }
+    public int TempoBuscaMediaMinuto { get; set; }
     public DateTime? DataInicioMedia { get; set; }
     public DateTime? DataFimMedia { get; set; }
+    public int DiasAtras { get; set; }
     public DangerOptions Medio { get; set; }
     public DangerOptions Alto { get; set; }
 

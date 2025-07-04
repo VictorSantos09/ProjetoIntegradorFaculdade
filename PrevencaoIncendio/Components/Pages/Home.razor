@@ -147,7 +147,7 @@
     private Timer _timer;
     private DateTime _ultimaBuscaMedia;
     private DateTime _proximaBuscaMedia;
-    private DateTime _buscaPadraoInicialMedia = DateTime.Now.AddDays(-7);
+    private DateTime _buscaPadraoInicialMedia;
     private DateTime _buscaPadraoFimMedia = DateTime.Now;
     private string TempoRestanteFormatado
     {
@@ -175,7 +175,7 @@
     {
         get
         {
-            var tempo = TimeSpan.FromMilliseconds(dangerParameters.TempoBuscaMediaMs);
+            var tempo = TimeSpan.FromMinutes(dangerParameters.TempoBuscaMediaMinuto);
             var partes = new List<string>();
 
             if (tempo.TotalSeconds < 60)
@@ -213,6 +213,8 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        _buscaPadraoInicialMedia = DateTime.Now.AddDays(-dangerParameters.DiasAtras);
+
         if (firstRender)
         {
             // Exibe o modal de confirmação
@@ -239,7 +241,7 @@
             }
 
             _cancellationTokenSource = new CancellationTokenSource();
-            _periodicTimer = new PeriodicTimer(TimeSpan.FromMilliseconds(dangerParameters.TempoBuscaMediaMs));
+            _periodicTimer = new PeriodicTimer(TimeSpan.FromMinutes(dangerParameters.TempoBuscaMediaMinuto));
 
             _ = Task.Run(async () =>
             {
@@ -276,7 +278,7 @@
                 valorAtual.ppm_MQ2 = Math.Round(valorAtual.ppm_MQ2, casasDecimais);
                 valorAtual.ppm_CO_MQ7 = Math.Round(valorAtual.ppm_CO_MQ7, casasDecimais);
 
-                await VerificarRiscoPerigo(valorAtual);
+                VerificarRiscoPerigo(valorAtual);
                 VerificarRiscoPerigoMedia();
 
                 _Leituras.Add(valorAtual);
@@ -323,7 +325,7 @@
                 valorMedia = valor;
                 VerificarRiscoPerigo(valorMedia);
                 _ultimaBuscaMedia = DateTime.Now;
-                _proximaBuscaMedia = _ultimaBuscaMedia.AddMilliseconds(dangerParameters.TempoBuscaMediaMs);
+                _proximaBuscaMedia = _ultimaBuscaMedia.AddMinutes(dangerParameters.TempoBuscaMediaMinuto);
             }
             else
             {
@@ -408,7 +410,7 @@ private static Valores CriarValorAtualVazio()
         umidade = 0,
     };
 }
-private async Task VerificarRiscoPerigo(Valores valores)
+private void VerificarRiscoPerigo(Valores valores)
 {
     // Referência: https://pubs.aip.org/aip/acp/article-abstract/2431/1/090004/2906139/Home-fire-early-warning-system-using-flame-smoke
     NotificationSeverity riscoPerigo = NotificationSeverity.Info;
@@ -491,8 +493,8 @@ private void VerificarRiscoPerigoMedia()
     {
         AddIfNotExists(new Alerta(
             Variant.Filled,
-            AlertStyle.Warning,
-            AlertSize.Large,
+            AlertStyle.Info,
+            AlertSize.Small,
             Shade.Default,
             IconeFogo,
             "Estado de chama/fogo diferente da média.",
@@ -516,8 +518,8 @@ private void VerificarVariacaoRelativa(
     {
         AddIfNotExists(new Alerta(
             Variant.Filled,
-            AlertStyle.Warning,
-            AlertSize.Large,
+            AlertStyle.Info,
+            AlertSize.Small,
             Shade.Default,
             icone,
             $"Estado de {nomeCampo.ToLower()} diferente da média.",
