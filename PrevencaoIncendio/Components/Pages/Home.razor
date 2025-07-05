@@ -6,7 +6,7 @@
 @using System.Timers
 @inject TooltipService tooltipService
 @inject NotificationService NotificationService
-@inject DangerParameters dangerParameters
+@inject IServiceProvider ServiceProvider
 @inject IValoresRepository ValoresRepository
 @inject IJSRuntime JSRuntime
 @inject DialogService ConfirmService
@@ -24,13 +24,14 @@
     <div class="rz-mb-4" style="display: flex; flex-wrap: wrap; gap: 16px;">
         @foreach (var alert in Alerts)
         {
-            <div style="flex: 1 1 300px;" @key="alert.Level">
+            <div style="flex: 1 0 300px; min-width: 300px; max-width: 300px; height: 100%;" @key="alert.Level">
                 <RadzenAlert Variant="@alert.Variant"
                              AlertStyle="@alert.Style"
                              Size="@alert.Size"
                              Shade="@alert.Shade"
                              Icon="@alert.Icon"
                              AllowClose="true"
+                             Style="height: 100%; display: flex; flex-direction: column; justify-content: space-between;"
                              Text="@alert.DataCriacao.ToString("dd/MM/yyyy HH:mm")"
                              Title="@alert.Message"
                              Close="@(() => RemoverAlerta(alert))" />
@@ -59,8 +60,8 @@
     <RadzenText TextStyle="TextStyle.H5" Class="rz-mt-4">Mediana das leituras</RadzenText>
     <RadzenText TextStyle="TextStyle.Subtitle1">Próxima consulta: <b>@TempoRestanteFormatado</b></RadzenText>
     <RadzenText TextStyle="TextStyle.Subtitle2">Frequência de busca: <b>@TempoBuscaFormatado</b></RadzenText>
-    <RadzenText TextStyle="TextStyle.Subtitle2">Período da média: <b>@dangerParameters.DataInicioMedia.GetValueOrDefault(_buscaPadraoInicialMedia).ToString("dd/MM/yyyy HH:mm")</b> a <b>@dangerParameters.DataFimMedia.GetValueOrDefault(_buscaPadraoFimMedia).ToString("dd/MM/yyyy HH:mm")</b></RadzenText>
-    <RadzenText TextStyle="TextStyle.Subtitle2"><b>Percentual de diferença: @(dangerParameters.PercentualDiferenca * 100)%</b></RadzenText>
+    <RadzenText TextStyle="TextStyle.Subtitle2">Período da média: <b>@DangerParameters.DataInicioMedia.GetValueOrDefault(_buscaPadraoInicialMedia).ToString("dd/MM/yyyy HH:mm")</b> a <b>@DangerParameters.DataFimMedia.GetValueOrDefault(_buscaPadraoFimMedia).ToString("dd/MM/yyyy HH:mm")</b></RadzenText>
+    <RadzenText TextStyle="TextStyle.Subtitle2"><b>Percentual de diferença: @(DangerParameters.PercentualDiferenca * 100)%</b></RadzenText>
     <RadzenText TextStyle="TextStyle.Subtitle2" Class="rz-mt-1">
         <i>As medianas são utilizadas por serem menos sensíveis a valores extremos ou leituras atípicas dos sensores, tornando a análise mais robusta e confiável.</i>
     </RadzenText>
@@ -175,7 +176,7 @@
     {
         get
         {
-            var tempo = TimeSpan.FromMinutes(dangerParameters.TempoBuscaMediaMinuto);
+            var tempo = TimeSpan.FromMinutes(DangerParameters.TempoBuscaMediaMinuto);
             var partes = new List<string>();
 
             if (tempo.TotalSeconds < 60)
@@ -200,6 +201,7 @@
     private CancellationTokenSource? _cancellationTokenSource;
     private bool _playingAudio = false;
     private bool audioEnabled = false;
+    private DangerParameters DangerParameters => ServiceProvider.GetRequiredService<DangerParameters>();
 
     private async Task PlayAudio()
     {
@@ -213,7 +215,7 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        _buscaPadraoInicialMedia = DateTime.Now.AddDays(-dangerParameters.DiasAtras);
+        _buscaPadraoInicialMedia = DateTime.Now.AddDays(-DangerParameters.DiasAtras);
 
         if (firstRender)
         {
@@ -241,7 +243,7 @@
             }
 
             _cancellationTokenSource = new CancellationTokenSource();
-            _periodicTimer = new PeriodicTimer(TimeSpan.FromMinutes(dangerParameters.TempoBuscaMediaMinuto));
+            _periodicTimer = new PeriodicTimer(TimeSpan.FromMinutes(DangerParameters.TempoBuscaMediaMinuto));
 
             _ = Task.Run(async () =>
             {
@@ -281,6 +283,9 @@
                 VerificarRiscoPerigo(valorAtual);
                 VerificarRiscoPerigoMedia();
 
+                var proximaBusca = _ultimaBuscaMedia.AddMinutes(DangerParameters.TempoBuscaMediaMinuto);
+                if (!_proximaBuscaMedia.Equals(proximaBusca)) _proximaBuscaMedia = proximaBusca;
+
                 _Leituras.Add(valorAtual);
             }
             else
@@ -319,13 +324,13 @@
     {
         try
         {
-            var valor = await ValoresRepository.GetNextMediansAsync(dangerParameters.DataInicioMedia.GetValueOrDefault(_buscaPadraoInicialMedia), dangerParameters.DataFimMedia.GetValueOrDefault(_buscaPadraoFimMedia));
+            var valor = await ValoresRepository.GetNextMediansAsync(DangerParameters.DataInicioMedia.GetValueOrDefault(_buscaPadraoInicialMedia), DangerParameters.DataFimMedia.GetValueOrDefault(_buscaPadraoFimMedia));
             if (valor is not null)
             {
                 valorMedia = valor;
                 VerificarRiscoPerigo(valorMedia);
                 _ultimaBuscaMedia = DateTime.Now;
-                _proximaBuscaMedia = _ultimaBuscaMedia.AddMinutes(dangerParameters.TempoBuscaMediaMinuto);
+                _proximaBuscaMedia = _ultimaBuscaMedia.AddMinutes(DangerParameters.TempoBuscaMediaMinuto);
             }
             else
             {
@@ -422,29 +427,29 @@ private void VerificarRiscoPerigo(Valores valores)
         temPerigo = true;
         riscoPerigo = NotificationSeverity.Error;
 
-        AddIfNotExists(new Alerta(Variant.Filled, AlertStyle.Danger, AlertSize.Large, Shade.Default, IconeFogo, "Fogo detectado.", AlertLevel.Fire));
+        AddIfNotExists(new Alerta(Variant.Filled, AlertStyle.Danger, AlertSize.Medium, Shade.Default, IconeFogo, "Fogo detectado.", AlertLevel.Fire));
     }
-    if (valores.ppm_CO_MQ7 >= dangerParameters.Co)
+    if (valores.ppm_CO_MQ7 >= DangerParameters.Co)
     {
         temPerigo = true;
         riscoPerigo = NotificationSeverity.Error;
 
-        AddIfNotExists(new Alerta(Variant.Filled, AlertStyle.Danger, AlertSize.Large, Shade.Default, IconeCo, "Monóxido de carbono detectado.", AlertLevel.Co));
+        AddIfNotExists(new Alerta(Variant.Filled, AlertStyle.Danger, AlertSize.Medium, Shade.Default, IconeCo, "Monóxido de carbono detectado.", AlertLevel.Co));
     }
 
-    if (valores.temperatura > dangerParameters.Medio.Temperatura || valores.ppm_MQ2 > dangerParameters.Medio.Ppm && !valores.chamaDetectada)
+    if (valores.temperatura > DangerParameters.Medio.Temperatura || valores.ppm_MQ2 > DangerParameters.Medio.Ppm && !valores.chamaDetectada)
     {
         temPerigo = true;
         riscoPerigo = NotificationSeverity.Warning;
 
-        AddIfNotExists(new Alerta(Variant.Filled, AlertStyle.Warning, AlertSize.Large, Shade.Default, Icon, "Ambiente em potencial risco, verifique.", AlertLevel.Warning));
+        AddIfNotExists(new Alerta(Variant.Filled, AlertStyle.Warning, AlertSize.Medium, Shade.Default, Icon, "Ambiente em potencial risco, verifique.", AlertLevel.Warning));
     }
-    else if (valores.temperatura > dangerParameters.Alto.Temperatura || valores.ppm_MQ2 > dangerParameters.Alto.Ppm && valores.chamaDetectada)
+    else if (valores.temperatura > DangerParameters.Alto.Temperatura || valores.ppm_MQ2 > DangerParameters.Alto.Ppm && valores.chamaDetectada)
     {
         temPerigo = true;
         riscoPerigo = NotificationSeverity.Error;
 
-        AddIfNotExists(new Alerta(Variant.Filled, AlertStyle.Danger, AlertSize.Large, Shade.Default, Icon, "Alto risco de incêndio, verifique imediatamente.", AlertLevel.Danger));
+        AddIfNotExists(new Alerta(Variant.Filled, AlertStyle.Danger, AlertSize.Medium, Shade.Default, Icon, "Alto risco de incêndio, verifique imediatamente.", AlertLevel.Danger));
     }
 
     if (temPerigo)
@@ -483,23 +488,23 @@ private void VerificarRiscoPerigo(Valores valores)
 }
 private void VerificarRiscoPerigoMedia()
 {
-    var margemPercentual = dangerParameters.PercentualDiferenca;
+    var margemPercentual = DangerParameters.PercentualDiferenca;
     VerificarVariacaoRelativa("Temperatura", valorAtual.temperatura, valorMedia.temperatura, margemPercentual, IconeTemperatura, AlertLevel.MediaTemperatura);
     VerificarVariacaoRelativa("Umidade", valorAtual.umidade, valorMedia.umidade, margemPercentual, IconeUmidade, AlertLevel.MediaUmidade);
     VerificarVariacaoRelativa("Fumaça", valorAtual.ppm_MQ2, valorMedia.ppm_MQ2, margemPercentual, IconePPM, AlertLevel.MediaPpm);
     VerificarVariacaoRelativa("Monóxido de carbono", valorAtual.ppm_CO_MQ7, valorMedia.ppm_CO_MQ7, margemPercentual, IconeCo, AlertLevel.MediaCo);
 
-    if (valorAtual.chamaDetectada != valorMedia.chamaDetectada)
-    {
-        AddIfNotExists(new Alerta(
-            Variant.Filled,
-            AlertStyle.Info,
-            AlertSize.Small,
-            Shade.Default,
-            IconeFogo,
-            "Estado de chama/fogo diferente da média.",
-            AlertLevel.MediaFire));
-    }
+    // if (valorAtual.chamaDetectada != valorMedia.chamaDetectada)
+    // {
+    //     AddIfNotExists(new Alerta(
+    //         Variant.Filled,
+    //         AlertStyle.Info,
+    //         AlertSize.Small,
+    //         Shade.Default,
+    //         IconeFogo,
+    //         "Estado de chama/fogo diferente da média.",
+    //         AlertLevel.MediaFire));
+    // }
 }
 
 private void VerificarVariacaoRelativa(
@@ -519,10 +524,10 @@ private void VerificarVariacaoRelativa(
         AddIfNotExists(new Alerta(
             Variant.Filled,
             AlertStyle.Info,
-            AlertSize.Small,
+            AlertSize.Medium,
             Shade.Default,
             icone,
-            $"Estado de {nomeCampo.ToLower()} diferente da média.",
+            $"Estado de {nomeCampo.ToLower()} acima da média.",
             nivelAlerta));
     }
 }
