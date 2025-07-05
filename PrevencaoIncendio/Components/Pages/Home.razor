@@ -149,7 +149,7 @@
     private DateTime _ultimaBuscaMedia;
     private DateTime _proximaBuscaMedia;
     private DateTime _buscaPadraoInicialMedia;
-    private DateTime _buscaPadraoFimMedia = DateTime.Now;
+    private DateTime _buscaPadraoFimMedia => DateTime.Now;
     private string TempoRestanteFormatado
     {
         get
@@ -429,7 +429,7 @@ private void VerificarRiscoPerigo(Valores valores)
 
         AddIfNotExists(new Alerta(Variant.Filled, AlertStyle.Danger, AlertSize.Medium, Shade.Default, IconeFogo, "Fogo detectado.", AlertLevel.Fire));
     }
-    if (valores.ppm_CO_MQ7 >= DangerParameters.Co)
+    if (valores.ppm_CO_MQ7 > DangerParameters.Co)
     {
         temPerigo = true;
         riscoPerigo = NotificationSeverity.Error;
@@ -519,7 +519,7 @@ private void VerificarVariacaoRelativa(
     var margemAbsolutaMinima = 0.1;
     var margem = Math.Max(valorMedia * percentualTolerado, margemAbsolutaMinima);
 
-    if (Math.Abs(valorAtual - valorMedia) > margem)
+    if (valorAtual > valorMedia + margem)
     {
         AddIfNotExists(new Alerta(
             Variant.Filled,
